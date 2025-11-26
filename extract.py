@@ -44,18 +44,29 @@ class OCRGuiApp:
         self.root.update_idletasks()
 
     def load_template(self):
-        path = filedialog.askopenfilename(filetypes=[("JSON Template", "*.json")])
+        path = filedialog.askopenfilename(
+            initialdir=os.getcwd(),
+            title="Pilih Template JSON",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
+        )
         if path:
             self.template_path = path
             self.log(f"Template dipilih: {path}")
 
     def load_folder(self):
-        folder = filedialog.askdirectory()
+        folder = filedialog.askdirectory(
+            initialdir=os.getcwd(),
+            title="Pilih Folder Gambar"
+        )
         if folder:
             self.image_folder = folder
             self.log(f"Folder gambar dipilih: {folder}")
 
     def start_ocr(self):
+        # Debug
+        self.log(f"[DEBUG] template_path = {self.template_path}")
+        self.log(f"[DEBUG] image_folder = {self.image_folder}")
+
         if not self.template_path:
             messagebox.showwarning("Error", "Pilih file template JSON dulu!")
             return
@@ -65,8 +76,16 @@ class OCRGuiApp:
             return
 
         # Load template JSON
-        with open(self.template_path, "r") as f:
-            template = json.load(f)
+        try:
+            with open(self.template_path, "r") as f:
+                template = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"Gagal membaca template JSON: {e}")
+            return
+
+        if "fields" not in template:
+            messagebox.showerror("Error", "Template JSON tidak memiliki key 'fields'")
+            return
 
         fields = template["fields"]
         rows = []
@@ -80,18 +99,21 @@ class OCRGuiApp:
 
                 image = cv2.imread(img_path)
                 if image is None:
-                    self.log(f"[SKIP] {filename} (gambar rusak)")
+                    self.log(f"[SKIP] {filename} (gambar rusak atau tidak bisa dibuka)")
                     continue
 
                 data = {"filename": filename}
 
                 # Crop + OCR tiap field
                 for field in fields:
-                    x, y, w, h = field["x"], field["y"], field["w"], field["h"]
-                    crop = image[y:y+h, x:x+w]
-
-                    text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
-                    data[field["name"]] = text
+                    try:
+                        x, y, w, h = field["x"], field["y"], field["w"], field["h"]
+                        crop = image[y:y+h, x:x+w]
+                        text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
+                        data[field["name"]] = text
+                    except Exception as e:
+                        self.log(f"[ERROR] Field {field['name']} gagal diambil: {e}")
+                        data[field["name"]] = ""
 
                 rows.append(data)
                 self.log(f"[OK] Extracted: {filename}")
