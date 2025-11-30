@@ -15,7 +15,7 @@ class OCRGuiApp:
     def __init__(self, root):
         self.root = root
         self.root.title("OCR Template Extractor")
-        self.root.geometry("500x430")
+        self.root.geometry("500x550")
         self.root.resizable(False, False)
 
         # --- VAR ---
@@ -35,13 +35,22 @@ class OCRGuiApp:
 
         # --- LOG AREA ---
         tk.Label(root, text="Log:").pack()
-        self.log_area = scrolledtext.ScrolledText(root, width=60, height=17)
+        self.log_area = scrolledtext.ScrolledText(root, width=60, height=10)
         self.log_area.pack(padx=10, pady=5)
+
+        # --- PREVIEW AREA ---
+        tk.Label(root, text="Preview Hasil Ekstraksi:").pack()
+        self.preview_area = scrolledtext.ScrolledText(root, width=60, height=10)
+        self.preview_area.pack(padx=10, pady=5)
 
     def log(self, text):
         self.log_area.insert(tk.END, text + "\n")
         self.log_area.see(tk.END)
         self.root.update_idletasks()
+
+    def preview(self, text):
+        self.preview_area.insert(tk.END, text + "\n")
+        self.preview_area.see(tk.END)
 
     def load_template(self):
         path = filedialog.askopenfilename(
@@ -91,6 +100,7 @@ class OCRGuiApp:
         rows = []
 
         self.log("\n=== Mulai proses OCR ===")
+        self.preview_area.delete(1.0, tk.END)  # Clear preview area
 
         # Loop semua file gambar
         for filename in os.listdir(self.image_folder):
@@ -117,6 +127,12 @@ class OCRGuiApp:
 
                 rows.append(data)
                 self.log(f"[OK] Extracted: {filename}")
+
+                # Preview hasil ekstraksi
+                preview_text = f"--- {filename} ---\n"
+                for field in fields:
+                    preview_text += f"{field['name']}: {data[field['name']]}\n"
+                self.preview(preview_text)
 
         # Save CSV
         df = pd.DataFrame(rows)

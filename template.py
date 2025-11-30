@@ -1,15 +1,36 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import json
+import cv2
+import pytesseract
+
+# Set Tesseract Path (Windows)
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 class TemplateGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Template Area Creator (Drag to Select)")
 
-        self.canvas = tk.Canvas(root, cursor="cross")
+        # Paned window for split layout
+        self.paned = tk.PanedWindow(root, orient=tk.HORIZONTAL)
+        self.paned.pack(fill=tk.BOTH, expand=True)
+
+        # Left side: Canvas
+        self.canvas_frame = tk.Frame(self.paned)
+        self.paned.add(self.canvas_frame)
+
+        self.canvas = tk.Canvas(self.canvas_frame, cursor="cross")
         self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        # Right side: Sidebar
+        self.sidebar = tk.Frame(self.paned, width=300)
+        self.paned.add(self.sidebar)
+
+        tk.Label(self.sidebar, text="Extraction Preview:").pack(anchor="w", padx=5, pady=5)
+        self.preview_text = tk.Text(self.sidebar, wrap=tk.WORD, state=tk.DISABLED)
+        self.preview_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         self.image = None
         self.tk_image = None
@@ -22,6 +43,7 @@ class TemplateGUI:
         frame.pack(fill=tk.X, side=tk.BOTTOM)
 
         tk.Button(frame, text="Open Image", command=self.open_image).pack(side=tk.LEFT, padx=5)
+        tk.Button(frame, text="Preview Extractions", command=self.preview_extractions).pack(side=tk.LEFT, padx=5)
         tk.Button(frame, text="Save Template", command=self.save_template).pack(side=tk.LEFT, padx=5)
 
         # Events
@@ -90,6 +112,31 @@ class TemplateGUI:
             json.dump({"fields": self.rectangles}, f, indent=4)
 
         print("Template saved to:", save_path)
+
+    def preview_extractions(self):
+        if not self.image:
+            messagebox.showwarning("Warning", "Open an image first!")
+            return
+
+        if not self.rectangles:
+            messagebox.showwarning("Warning", "Select at least one area first!")
+            return
+
+        # Convert PIL image to OpenCV format
+        cv_image = cv2.cvtColor(cv2.imread(self.image.filename), cv2.COLOR_RGB2BGR)
+
+        # Clear previous preview
+        self.preview_text.config(state=tk.NORMAL)
+        self.preview_text.delete(1.0, tk.END)
+        self.preview_text.insert(tk.END, "Extraction Preview:\n\n")
+
+        for field in self.rectangles:
+            x, y, w, h = field["x"], field["y"], field["w"], field["h"]
+            crop = cv_image[y:y+h, x:x+w]
+            text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
+            self.preview_text.insert(tk.END, f"{field['name']}: {text}\n\n")
+
+        self.preview_text.config(state=tk.DISABLED)
 
 
 if __name__ == "__main__":
