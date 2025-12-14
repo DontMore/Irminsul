@@ -3,147 +3,89 @@ import json
 import cv2
 import pytesseract
 import pandas as pd
-from PIL import Image
-import tkinter as tk
-from tkinter import filedialog, scrolledtext, messagebox
-
-# Set Tesseract Path (Windows)
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import sys
 
 
-class OCRGuiApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("OCR Template Extractor")
-        self.root.geometry("500x550")
-        self.root.resizable(False, False)
+def run_ocr(template_path, image_folder, output_dir="/data"):
+    print("=== OCR START ===")
+    print(f"Template path : {template_path}")
+    print(f"Image folder  : {image_folder}")
+    print(f"Output dir    : {output_dir}")
 
-        # --- VAR ---
-        self.template_path = None
-        self.image_folder = None
+    # --- Validasi path ---
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(f"Template tidak ditemukan: {template_path}")
 
-        # --- BUTTONS ---
-        tk.Button(root, text="Pilih Template JSON", width=25, command=self.load_template)\
-            .pack(pady=10)
+    if not os.path.isdir(image_folder):
+        raise NotADirectoryError(f"Folder gambar tidak ditemukan: {image_folder}")
 
-        tk.Button(root, text="Pilih Folder Gambar", width=25, command=self.load_folder)\
-            .pack(pady=5)
+    # --- Load template ---
+    with open(template_path, "r", encoding="utf-8") as f:
+        template = json.load(f)
 
-        tk.Button(root, text="Mulai OCR", width=25, bg="#4CAF50", fg="white",
-                  command=self.start_ocr)\
-            .pack(pady=10)
+    if "fields" not in template:
+        raise KeyError("Template JSON tidak memiliki key 'fields'")
 
-        # --- LOG AREA ---
-        tk.Label(root, text="Log:").pack()
-        self.log_area = scrolledtext.ScrolledText(root, width=60, height=10)
-        self.log_area.pack(padx=10, pady=5)
+    fields = template["fields"]
+    rows = []
 
-        # --- PREVIEW AREA ---
-        tk.Label(root, text="Preview Hasil Ekstraksi:").pack()
-        self.preview_area = scrolledtext.ScrolledText(root, width=60, height=10)
-        self.preview_area.pack(padx=10, pady=5)
+    images = os.listdir(image_folder)
+    print(f"Jumlah file di folder gambar: {len(images)}")
 
-    def log(self, text):
-        self.log_area.insert(tk.END, text + "\n")
-        self.log_area.see(tk.END)
-        self.root.update_idletasks()
+    for filename in images:
+        if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
 
-    def preview(self, text):
-        self.preview_area.insert(tk.END, text + "\n")
-        self.preview_area.see(tk.END)
+        img_path = os.path.join(image_folder, filename)
+        print(f"Processing: {filename}")
 
-    def load_template(self):
-        path = filedialog.askopenfilename(
-            initialdir=os.getcwd(),
-            title="Pilih Template JSON",
-            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
-        )
-        if path:
-            self.template_path = path
-            self.log(f"Template dipilih: {path}")
+        image = cv2.imread(img_path)
+        if image is None:
+            print(f"  [SKIP] Tidak bisa membaca gambar")
+            continue
 
-    def load_folder(self):
-        folder = filedialog.askdirectory(
-            initialdir=os.getcwd(),
-            title="Pilih Folder Gambar"
-        )
-        if folder:
-            self.image_folder = folder
-            self.log(f"Folder gambar dipilih: {folder}")
+        data = {"filename": filename}
 
-    def start_ocr(self):
-        # Debug
-        self.log(f"[DEBUG] template_path = {self.template_path}")
-        self.log(f"[DEBUG] image_folder = {self.image_folder}")
+        for field in fields:
+            try:
+                x = field["x"]
+                y = field["y"]
+                w = field["w"]
+                h = field["h"]
 
-        if not self.template_path:
-            messagebox.showwarning("Error", "Pilih file template JSON dulu!")
-            return
+                crop = image[y:y + h, x:x + w]
 
-        if not self.image_folder:
-            messagebox.showwarning("Error", "Pilih folder gambar dulu!")
-            return
+                text = pytesseract.image_to_string(
+                    crop,
+                    lang="eng+ind"
+                ).strip()
 
-        # Load template JSON
-        try:
-            with open(self.template_path, "r") as f:
-                template = json.load(f)
-        except Exception as e:
-            messagebox.showerror("Error", f"Gagal membaca template JSON: {e}")
-            return
+                data[field["name"]] = text
 
-        if "fields" not in template:
-            messagebox.showerror("Error", "Template JSON tidak memiliki key 'fields'")
-            return
+            except Exception as e:
+                print(f"  [ERROR] Field {field.get('name', '?')}: {e}")
+                data[field["name"]] = ""
 
-        fields = template["fields"]
-        rows = []
+        rows.append(data)
 
-        self.log("\n=== Mulai proses OCR ===")
-        self.preview_area.delete(1.0, tk.END)  # Clear preview area
+    if not rows:
+        print("⚠️ Tidak ada data OCR yang dihasilkan")
 
-        # Loop semua file gambar
-        for filename in os.listdir(self.image_folder):
-            if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-                img_path = os.path.join(self.image_folder, filename)
+    # --- Simpan CSV ke volume ---
+    output_path = os.path.join(output_dir, "hasil_ocr.csv")
+    df = pd.DataFrame(rows)
+    df.to_csv(output_path, index=False, encoding="utf-8")
 
-                image = cv2.imread(img_path)
-                if image is None:
-                    self.log(f"[SKIP] {filename} (gambar rusak atau tidak bisa dibuka)")
-                    continue
-
-                data = {"filename": filename}
-
-                # Crop + OCR tiap field
-                for field in fields:
-                    try:
-                        x, y, w, h = field["x"], field["y"], field["w"], field["h"]
-                        crop = image[y:y+h, x:x+w]
-                        text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
-                        data[field["name"]] = text
-                    except Exception as e:
-                        self.log(f"[ERROR] Field {field['name']} gagal diambil: {e}")
-                        data[field["name"]] = ""
-
-                rows.append(data)
-                self.log(f"[OK] Extracted: {filename}")
-
-                # Preview hasil ekstraksi
-                preview_text = f"--- {filename} ---\n"
-                for field in fields:
-                    preview_text += f"{field['name']}: {data[field['name']]}\n"
-                self.preview(preview_text)
-
-        # Save CSV
-        df = pd.DataFrame(rows)
-        df.to_csv("hasil_ocr.csv", index=False, encoding="utf-8")
-
-        self.log("\nSelesai! Data disimpan ke hasil_ocr.csv")
-        messagebox.showinfo("Selesai", "OCR selesai!\nFile: hasil_ocr.csv")
+    print(f"=== OCR SELESAI ===")
+    print(f"Output file: {output_path}")
 
 
-# === RUN APP ===
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = OCRGuiApp(root)
-    root.mainloop()
+    if len(sys.argv) < 3:
+        print("Usage: python extract.py template.json image_folder")
+        sys.exit(1)
+
+    template = sys.argv[1]
+    folder = sys.argv[2]
+
+    run_ocr(template, folder)
