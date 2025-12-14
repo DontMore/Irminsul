@@ -6,11 +6,20 @@ import pandas as pd
 import sys
 
 
+<<<<<<< HEAD
 def run_ocr(template_path, image_folder, output_dir="/data"):
     print("=== OCR START ===")
     print(f"Template path : {template_path}")
     print(f"Image folder  : {image_folder}")
     print(f"Output dir    : {output_dir}")
+=======
+class OCRGuiApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("OCR Template Extractor")
+        self.root.geometry("500x550")
+        self.root.resizable(False, False)
+>>>>>>> origin/main
 
     # --- Validasi path ---
     if not os.path.exists(template_path):
@@ -26,6 +35,7 @@ def run_ocr(template_path, image_folder, output_dir="/data"):
     if "fields" not in template:
         raise KeyError("Template JSON tidak memiliki key 'fields'")
 
+<<<<<<< HEAD
     fields = template["fields"]
     rows = []
 
@@ -35,6 +45,36 @@ def run_ocr(template_path, image_folder, output_dir="/data"):
     for filename in images:
         if not filename.lower().endswith((".png", ".jpg", ".jpeg")):
             continue
+=======
+        # --- LOG AREA ---
+        tk.Label(root, text="Log:").pack()
+        self.log_area = scrolledtext.ScrolledText(root, width=60, height=10)
+        self.log_area.pack(padx=10, pady=5)
+
+        # --- PREVIEW AREA ---
+        tk.Label(root, text="Preview Hasil Ekstraksi:").pack()
+        self.preview_area = scrolledtext.ScrolledText(root, width=60, height=10)
+        self.preview_area.pack(padx=10, pady=5)
+
+    def log(self, text):
+        self.log_area.insert(tk.END, text + "\n")
+        self.log_area.see(tk.END)
+        self.root.update_idletasks()
+
+    def preview(self, text):
+        self.preview_area.insert(tk.END, text + "\n")
+        self.preview_area.see(tk.END)
+
+    def load_template(self):
+        path = filedialog.askopenfilename(
+            initialdir=os.getcwd(),
+            title="Pilih Template JSON",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
+        )
+        if path:
+            self.template_path = path
+            self.log(f"Template dipilih: {path}")
+>>>>>>> origin/main
 
         img_path = os.path.join(image_folder, filename)
         print(f"Processing: {filename}")
@@ -62,9 +102,14 @@ def run_ocr(template_path, image_folder, output_dir="/data"):
 
                 data[field["name"]] = text
 
+<<<<<<< HEAD
             except Exception as e:
                 print(f"  [ERROR] Field {field.get('name', '?')}: {e}")
                 data[field["name"]] = ""
+=======
+        self.log("\n=== Mulai proses OCR ===")
+        self.preview_area.delete(1.0, tk.END)  # Clear preview area
+>>>>>>> origin/main
 
         rows.append(data)
 
@@ -76,8 +121,37 @@ def run_ocr(template_path, image_folder, output_dir="/data"):
     df = pd.DataFrame(rows)
     df.to_csv(output_path, index=False, encoding="utf-8")
 
+<<<<<<< HEAD
     print(f"=== OCR SELESAI ===")
     print(f"Output file: {output_path}")
+=======
+                # Crop + OCR tiap field
+                for field in fields:
+                    try:
+                        x, y, w, h = field["x"], field["y"], field["w"], field["h"]
+                        crop = image[y:y+h, x:x+w]
+                        text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
+                        data[field["name"]] = text
+                    except Exception as e:
+                        self.log(f"[ERROR] Field {field['name']} gagal diambil: {e}")
+                        data[field["name"]] = ""
+
+                rows.append(data)
+                self.log(f"[OK] Extracted: {filename}")
+
+                # Preview hasil ekstraksi
+                preview_text = f"--- {filename} ---\n"
+                for field in fields:
+                    preview_text += f"{field['name']}: {data[field['name']]}\n"
+                self.preview(preview_text)
+
+        # Save CSV
+        df = pd.DataFrame(rows)
+        df.to_csv("hasil_ocr.csv", index=False, encoding="utf-8")
+
+        self.log("\nSelesai! Data disimpan ke hasil_ocr.csv")
+        messagebox.showinfo("Selesai", "OCR selesai!\nFile: hasil_ocr.csv")
+>>>>>>> origin/main
 
 
 if __name__ == "__main__":

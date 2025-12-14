@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TODO: Penggabungan GUI.py dan Template.py
 
 ## Status: Dalam Progress
@@ -33,3 +34,11 @@
 - [x] Integrasi TemplateGUI class
 - [x] Update requirements.txt
 - [ ] Testing integrasi
+=======
+- [x] Add OCR imports (cv2, pytesseract) to template.py
+- [x] Set pytesseract path for Windows
+- [x] Add "Preview Extractions" button to the GUI
+- [x] Implement preview_extractions method to perform OCR on selected areas and display in a popup
+- [x] Test the preview functionality
+- [x] Change preview display to sidebar instead of popup
+>>>>>>> origin/main
