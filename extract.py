@@ -4,11 +4,62 @@ import cv2
 import pytesseract
 import pandas as pd
 import sys
+import base64
+import numpy as np
+from PIL import Image
+import io
 
 
-<<<<<<< HEAD
+def decode_base64_image(base64_string):
+    """Decode base64 string ke PIL Image"""
+    image_data = base64.b64decode(base64_string)
+    image = Image.open(io.BytesIO(image_data))
+    # Convert to OpenCV format
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+
+def run_ocr_preview(input_data):
+    """Jalankan OCR preview untuk single image"""
+    print("=== OCR PREVIEW START ===")
+
+    image_b64 = input_data.get("image")
+    fields = input_data.get("fields", [])
+
+    if not image_b64:
+        raise ValueError("No image data provided")
+
+    # Decode gambar dari base64
+    image = decode_base64_image(image_b64)
+
+    results = {}
+
+    for field in fields:
+        try:
+            x = field["x"]
+            y = field["y"]
+            w = field["w"]
+            h = field["h"]
+
+            # Crop area
+            crop = image[y:y + h, x:x + w]
+
+            # OCR
+            text = pytesseract.image_to_string(
+                crop,
+                lang="eng+ind"
+            ).strip()
+
+            results[field["name"]] = text
+
+        except Exception as e:
+            print(f"  [ERROR] Field {field.get('name', '?')}: {e}")
+            results[field["name"]] = ""
+
+    return results
+
+
 def run_ocr(template_path, image_folder, output_dir="/data"):
-    print("=== OCR START ===")
+    print("=== OCR BATCH START ===")
     print(f"Template path : {template_path}")
     print(f"Image folder  : {image_folder}")
     print(f"Output dir    : {output_dir}")

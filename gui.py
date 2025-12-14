@@ -269,7 +269,6 @@ class ModernTemplateGUI:
         except Exception as e:
             messagebox.showerror("❌ Error", f"Failed to save template: {str(e)}")
 
-
     def preview_extractions(self):
         """Preview OCR extractions from selected areas"""
         if not self.image:
@@ -308,29 +307,10 @@ class ModernTemplateGUI:
             self.preview_text.config(state=tk.DISABLED)
             self.update_status("👁️ Extraction preview generated!", "#10b981")
             messagebox.showinfo("✅ Preview", "Extraction preview generated!")
-        except pytesseract.TesseractNotFoundError:
-            error_msg = """❌ Tesseract OCR tidak terinstall!
-
-Untuk menggunakan fitur preview OCR, install Tesseract:
-
-🔧 Ubuntu/Debian:
-   sudo apt update && sudo apt install tesseract-ocr tesseract-ocr-ind
-
-🔧 macOS:
-   brew install tesseract tesseract-lang
-
-🔧 Windows:
-   Download dari: https://github.com/UB-Mannheim/tesseract/wiki
-   Kemudian tambahkan ke PATH
-
-💡 Alternatif: Gunakan Docker OCR untuk memproses gambar."""
-            messagebox.showerror("❌ Tesseract Not Found", error_msg)
-            self.update_status("❌ Install Tesseract untuk OCR preview", "#ef4444")
         except Exception as e:
-            error_msg = f"Failed to preview extractions: {str(e)}\n\nTips:\n• Pastikan Tesseract sudah terinstall\n• Restart aplikasi setelah install Tesseract\n• Check PATH environment variable"
-            messagebox.showerror("❌ Error", error_msg)
+            messagebox.showerror("❌ Error", f"Failed to preview extractions: {str(e)}")
 
-class OCRGui:
+class ModernOCRGui:
     def __init__(self, root):
         self.root = root
         self.root.title("🚀 Modern OCR GUI - Screenshot + Template Creator + Docker")
@@ -375,6 +355,40 @@ class OCRGui:
             style='Modern.TLabel'
         ).pack()
         
+        # Folder selection section
+        folder_section = create_modern_frame(self.screenshot_frame, padding=20)
+        folder_section.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        # Folder selection row
+        folder_row = create_modern_frame(folder_section, padding=0)
+        folder_row.pack(fill=tk.X, pady=(0, 10))
+        
+        create_modern_label(
+            folder_row, 
+            "📁 Output Folder:", 
+            style='Modern.TLabel'
+        ).pack(side=tk.LEFT)
+        
+        # Folder path entry
+        self.folder_var = tk.StringVar(value=self.image_folder)
+        self.folder_entry = tk.Entry(
+            folder_row, 
+            textvariable=self.folder_var,
+            font=('Consolas', 9),
+            bg='white',
+            fg='#1e293b',
+            relief='solid',
+            borderwidth=1
+        )
+        self.folder_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(15, 10))
+        
+        create_modern_button(
+            folder_row, 
+            "📂 Browse", 
+            self.browse_output_folder, 
+            style='Secondary.TButton'
+        ).pack(side=tk.RIGHT)
+
         # Main screenshot section
         screenshot_section = create_modern_frame(self.screenshot_frame, padding=20)
         screenshot_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
@@ -416,6 +430,24 @@ class OCRGui:
         )
         
         self.screenshot_log.pack(fill=tk.BOTH, expand=True)
+
+    def browse_output_folder(self):
+        """Browse and select output folder for screenshots"""
+        folder_path = filedialog.askdirectory(
+            title="Pilih Folder Output Screenshot",
+            initialdir=self.image_folder
+        )
+        
+        if folder_path:
+            # Validate folder path
+            try:
+                os.makedirs(folder_path, exist_ok=True)
+                self.image_folder = folder_path
+                self.folder_var.set(folder_path)
+                self.screenshot_log.insert(tk.END, f"📁 Folder output diubah ke: {folder_path}\n")
+                self.screenshot_log.see(tk.END)
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Gagal mengakses folder: {str(e)}")
 
     def setup_template_tab(self):
         # Header
@@ -516,15 +548,33 @@ class OCRGui:
         ScreenshotMiniGUI(win, callback=self.after_screenshot)
 
     def after_screenshot(self, path):
-        self.screenshot_log.insert(tk.END, f"✅ Screenshot tersimpan: {path}\n")
-        self.screenshot_log.see(tk.END)
+        """Handle screenshot completion with custom folder path"""
+        try:
+            # Ensure the output folder exists
+            os.makedirs(self.image_folder, exist_ok=True)
+            
+            # Update screenshot log
+            self.screenshot_log.insert(tk.END, f"✅ Screenshot tersimpan: {path}\n")
+            self.screenshot_log.insert(tk.END, f"📁 Output folder: {self.image_folder}\n")
+            self.screenshot_log.see(tk.END)
+            
+            # Also update main log if available
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"✅ Screenshot baru: {os.path.basename(path)}\n")
+                self.log.see(tk.END)
+                
+        except Exception as e:
+            error_msg = f"Gagal memproses screenshot: {str(e)}"
+            messagebox.showerror("❌ Error", error_msg)
+            print(f"Screenshot processing error: {e}")
 
     def on_template_created(self, template_path):
         """Callback when a new template is created"""
         self.current_template_path = template_path
         self.template_label.config(text=os.path.basename(template_path), foreground="#10b981")
-        self.log.insert(tk.END, f"✅ Template baru dibuat: {template_path}\n")
-        self.log.see(tk.END)
+        if hasattr(self, 'log'):
+            self.log.insert(tk.END, f"✅ Template baru dibuat: {template_path}\n")
+            self.log.see(tk.END)
         
         # Switch to OCR tab
         self.notebook.select(self.ocr_frame)
@@ -534,8 +584,9 @@ class OCRGui:
         if self.template:
             self.current_template_path = self.template
             self.template_label.config(text=os.path.basename(self.template), foreground="#10b981")
-            self.log.insert(tk.END, f"📁 Template dipilih: {self.template}\n")
-            self.log.see(tk.END)
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"📁 Template dipilih: {self.template}\n")
+                self.log.see(tk.END)
 
     def run_ocr(self):
         if not self.current_template_path:
@@ -543,29 +594,39 @@ class OCRGui:
             return
 
         try:
-            base_dir = os.path.dirname(self.current_template_path)
+            # Get the directory of the template file
+            template_dir = os.path.dirname(self.current_template_path)
+            
+            # Ensure output folder exists
+            os.makedirs(self.image_folder, exist_ok=True)
 
             cmd = [
                 "docker", "run", "--rm",
-                "-v", f"{base_dir}:/data",
+                "-v", f"{template_dir}:/data",
                 "ocr-app",
                 "/data/" + os.path.basename(self.current_template_path),
-                "/data/" + self.image_folder
+                "/data/" + os.path.relpath(self.image_folder, template_dir)
             ]
 
-            self.log.insert(tk.END, "🚀 Menjalankan OCR di Docker...\n")
-            self.log.see(tk.END)
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, "🚀 Menjalankan OCR di Docker...\n")
+                self.log.insert(tk.END, f"📁 Template: {os.path.basename(self.current_template_path)}\n")
+                self.log.insert(tk.END, f"📁 Output folder: {self.image_folder}\n")
+                self.log.see(tk.END)
+            
             self.root.update()
             
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
-                self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
-                self.log.see(tk.END)
+                if hasattr(self, 'log'):
+                    self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
+                    self.log.see(tk.END)
                 messagebox.showinfo("✅ Selesai", "OCR selesai!")
             else:
-                self.log.insert(tk.END, f"❌ Error: {result.stderr}\n")
-                self.log.see(tk.END)
+                if hasattr(self, 'log'):
+                    self.log.insert(tk.END, f"❌ Error: {result.stderr}\n")
+                    self.log.see(tk.END)
                 messagebox.showerror("❌ Error", f"OCR gagal: {result.stderr}")
                 
         except FileNotFoundError:
@@ -575,5 +636,5 @@ class OCRGui:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = OCRGui(root)
+    app = ModernOCRGui(root)
     root.mainloop()
