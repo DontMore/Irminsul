@@ -543,9 +543,10 @@ class ModernOCRGui:
         
         self.log.pack(fill=tk.BOTH, expand=True)
 
+
     def open_screenshot(self):
         win = tk.Toplevel(self.root)
-        ScreenshotMiniGUI(win, callback=self.after_screenshot)
+        ScreenshotMiniGUI(win, callback=self.after_screenshot, save_dir=self.image_folder)
 
     def after_screenshot(self, path):
         """Handle screenshot completion with custom folder path"""
