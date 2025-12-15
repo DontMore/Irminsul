@@ -36,14 +36,18 @@ class ModernTemplateGUI:
         self.canvas_frame = create_modern_frame(self.paned, padding=0)
         self.paned.add(self.canvas_frame, minsize=600)
 
-        # Modern canvas with border
+
+        # Modern canvas with improved configuration
         self.canvas = tk.Canvas(
             self.canvas_frame, 
             cursor="cross", 
             bg="white",
-            highlightthickness=1,
-            highlightbackground="#e2e8f0"
+            highlightthickness=0,  # Remove border to prevent interference
+            highlightbackground="white"
         )
+        
+        # Configure canvas scrollregion immediately
+        self.canvas.configure(scrollregion=(0, 0, 1000, 800))
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
         # Right side: Sidebar with modern styling
@@ -134,6 +138,7 @@ class ModernTemplateGUI:
         """Update status with modern styling"""
         self.status_label.config(text=message, foreground=color)
 
+
     def open_image(self):
         """Open and display an image with proper error handling and scaling"""
         path = filedialog.askopenfilename(filetypes=[
@@ -165,30 +170,50 @@ class ModernTemplateGUI:
                 self.image = self.original_image.copy()
                 self.update_status(f"Image loaded: {self.image.width}x{self.image.height}", "#10b981")
             
-            # Store PhotoImage as instance variable to prevent garbage collection
+            # CRITICAL: Store PhotoImage as instance variable to prevent garbage collection
             self.tk_image = ImageTk.PhotoImage(self.image)
             
             # Clear canvas and reset rectangles
             self.canvas.delete("all")
             self.rectangles = []
             
-            # Calculate center position for image
-            canvas_width = self.canvas.winfo_width()
-            canvas_height = self.canvas.winfo_height()
+            # Force canvas to update before getting dimensions
+            self.canvas.update_idletasks()
             
-            if canvas_width <= 1 or canvas_height <= 1:
-                canvas_width, canvas_height = 600, 400
+            # Get canvas dimensions with multiple fallback strategies
+            try:
+                canvas_width = self.canvas.winfo_width()
+                canvas_height = self.canvas.winfo_height()
+                
+                # If canvas still has no size, try to get frame size
+                if canvas_width <= 1 or canvas_height <= 1:
+                    canvas_width = self.canvas_frame.winfo_width()
+                    canvas_height = self.canvas_frame.winfo_height()
+                    
+                # Final fallback to reasonable defaults
+                if canvas_width <= 1 or canvas_height <= 1:
+                    canvas_width, canvas_height = 800, 600
+                    
+            except Exception as e:
+                print(f"Warning: Could not get canvas dimensions: {e}")
+                canvas_width, canvas_height = 800, 600
             
+            # Calculate position to center image properly
             x = max(0, (canvas_width - self.image.width) // 2)
             y = max(0, (canvas_height - self.image.height) // 2)
             
-            # Display image on canvas
-            self.canvas.create_image(x, y, anchor="nw", image=self.tk_image)
+            print(f"Canvas size: {canvas_width}x{canvas_height}")
+            print(f"Image size: {self.image.width}x{self.image.height}")
+            print(f"Image position: x={x}, y={y}")
             
-            # Update canvas scroll region
-            bbox = self.canvas.bbox("all")
-            if bbox:
-                self.canvas.configure(scrollregion=bbox)
+            # Display image on canvas with proper anchoring
+            image_id = self.canvas.create_image(x, y, anchor="nw", image=self.tk_image, tags="main_image")
+            
+            # Configure canvas scroll region to include entire image
+            padding = 20
+            scroll_width = max(canvas_width, self.image.width + 2 * padding)
+            scroll_height = max(canvas_height, self.image.height + 2 * padding)
+            self.canvas.configure(scrollregion=(0, 0, scroll_width, scroll_height))
             
             # Clear preview text
             if self.preview_text:
@@ -197,12 +222,15 @@ class ModernTemplateGUI:
                 self.preview_text.insert(1.0, "Pilih area dengan drag mouse untuk ekstraksi teks...\n\n💡 Tips:\n• Drag mouse untuk memilih area\n• Area minimum 5x5 pixels\n• Gunakan Preview untuk melihat hasil OCR")
                 self.preview_text.config(state=tk.DISABLED)
                 
-            messagebox.showinfo("✅ Success", f"Image loaded successfully!\nSize: {self.image.width}x{self.image.height}")
+            messagebox.showinfo("✅ Success", f"Image loaded successfully!\nSize: {self.image.width}x{self.image.height}\nCanvas: {canvas_width}x{canvas_height}")
             
         except Exception as e:
             error_msg = f"Failed to load image: {str(e)}\n\nTips:\n• Pastikan file gambar tidak corrupt\n• Format yang didukung: PNG, JPG, JPEG"
             messagebox.showerror("❌ Error", error_msg)
             print(f"Error loading image: {e}")
+            # Reset image references on error
+            self.image = None
+            self.tk_image = None
 
     def on_mouse_down(self, event):
         """Handle mouse press for rectangle selection"""
