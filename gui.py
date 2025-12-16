@@ -26,8 +26,8 @@ class ModernTemplateGUI:
         self.zoom_factor = 1.0
         self.min_zoom = 0.1
         self.max_zoom = 5.0
-        self.image_x = 0
-        self.image_y = 0
+        self.image_offset_x = 0  # Image top-left position on canvas
+        self.image_offset_y = 0
         self.viewport_width = 600
         self.viewport_height = 400
         
@@ -96,6 +96,14 @@ class ModernTemplateGUI:
         right_controls = create_modern_frame(control_panel, padding=0)
         right_controls.pack(side=tk.RIGHT)
         
+
+        create_modern_button(
+            right_controls, 
+            "⛶ Full Screen", 
+            self.toggle_fullscreen, 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
         create_modern_button(
             right_controls, 
             "👁️ Preview", 
@@ -151,10 +159,12 @@ class ModernTemplateGUI:
         self.canvas.bind("<Button-4>", self.on_mousewheel)  # Linux scroll up
         self.canvas.bind("<Button-5>", self.on_mousewheel)  # Linux scroll down
         
+
         # Keyboard events
         self.canvas.bind("<KeyPress-plus>", lambda e: self.zoom_in())
         self.canvas.bind("<KeyPress-minus>", lambda e: self.zoom_out())
         self.canvas.bind("<KeyPress-f>", lambda e: self.fit_to_screen())
+        self.parent_frame.winfo_toplevel().bind("<Escape>", lambda e: self.exit_fullscreen())
         
         # Focus canvas to receive keyboard events
         self.canvas.focus_set()
@@ -353,9 +363,21 @@ class ModernTemplateGUI:
         self.update_field_stats()
 
 
+
     def update_status(self, message, color="#64748b"):
         """Update status with modern styling"""
         self.status_label.config(text=message, foreground=color)
+
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode"""
+        root = self.parent_frame.winfo_toplevel()
+        is_fullscreen = root.attributes("-fullscreen")
+        root.attributes("-fullscreen", not is_fullscreen)
+
+    def exit_fullscreen(self):
+        """Exit fullscreen mode"""
+        root = self.parent_frame.winfo_toplevel()
+        root.attributes("-fullscreen", False)
 
     def zoom_in(self):
         """Zoom in the image"""
@@ -431,11 +453,11 @@ class ModernTemplateGUI:
             print(f"Warning: Could not get canvas dimensions in redraw: {e}")
             canvas_width, canvas_height = 800, 600
             
-        x = max(0, (canvas_width - new_width) // 2)
-        y = max(0, (canvas_height - new_height) // 2)
-        
+        self.image_offset_x = max(0, (canvas_width - new_width) // 2)
+        self.image_offset_y = max(0, (canvas_height - new_height) // 2)
+
         # Draw image with proper anchoring and tags
-        image_id = self.canvas.create_image(x, y, anchor="nw", image=self.tk_image, tags="main_image")
+        image_id = self.canvas.create_image(self.image_offset_x, self.image_offset_y, anchor="nw", image=self.tk_image, tags="main_image")
         
         # Redraw rectangles
         self.redraw_rectangles()
@@ -450,13 +472,13 @@ class ModernTemplateGUI:
         """Redraw all rectangles with current zoom"""
         if not self.rectangles:
             return
-            
+
         for rect in self.rectangles:
-            x = int(rect["x"] * self.zoom_factor)
-            y = int(rect["y"] * self.zoom_factor)
+            x = int(rect["x"] * self.zoom_factor + self.image_offset_x)
+            y = int(rect["y"] * self.zoom_factor + self.image_offset_y)
             w = int(rect["w"] * self.zoom_factor)
             h = int(rect["h"] * self.zoom_factor)
-            
+
             self.canvas.create_rectangle(
                 x, y, x + w, y + h,
                 outline="#2563eb", width=2, tags="field_rect"
@@ -513,19 +535,19 @@ class ModernTemplateGUI:
         if selection:
             item = self.fields_tree.item(selection[0])
             field_name = item['values'][0]
-            
+
             # Find and highlight the corresponding rectangle
             for i, rect in enumerate(self.rectangles):
                 if rect["name"] == field_name:
                     # Remove previous highlights
                     self.canvas.delete("highlight")
-                    
-                    # Draw highlight
-                    x = int(rect["x"] * self.zoom_factor)
-                    y = int(rect["y"] * self.zoom_factor)
+
+                    # Draw highlight (add image offset)
+                    x = int(rect["x"] * self.zoom_factor + self.image_offset_x)
+                    y = int(rect["y"] * self.zoom_factor + self.image_offset_y)
                     w = int(rect["w"] * self.zoom_factor)
                     h = int(rect["h"] * self.zoom_factor)
-                    
+
                     self.canvas.create_rectangle(
                         x, y, x + w, y + h,
                         outline="#fbbf24", width=4, tags="highlight"
@@ -611,8 +633,8 @@ class ModernTemplateGUI:
             
             # Reset zoom and position
             self.zoom_factor = 1.0
-            self.image_x = 0
-            self.image_y = 0
+            self.image_offset_x = 0
+            self.image_offset_y = 0
             
             # Clear previous rectangles
             self.rectangles = []
@@ -669,50 +691,56 @@ class ModernTemplateGUI:
             self.tk_image = None
 
 
+
     def on_mouse_down(self, event):
         """Handle mouse press for rectangle selection"""
         if not self.image:
             messagebox.showwarning("⚠️ Warning", "Buka gambar terlebih dahulu!")
             return
-            
-        # Convert screen coordinates to image coordinates
-        image_x = event.x / self.zoom_factor
-        image_y = event.y / self.zoom_factor
-        
+
+        # Convert window coordinates to canvas coordinates (accounting for scroll)
+        canvas_x = self.canvas.canvasx(event.x)
+        canvas_y = self.canvas.canvasy(event.y)
+
+        # Convert canvas coordinates to image coordinates (accounting for image offset)
+        image_x = (canvas_x - self.image_offset_x) / self.zoom_factor
+        image_y = (canvas_y - self.image_offset_y) / self.zoom_factor
+
         self.start_x = image_x
         self.start_y = image_y
         self.current_rect = self.canvas.create_rectangle(
-            self.start_x * self.zoom_factor, 
-            self.start_y * self.zoom_factor, 
-            self.start_x * self.zoom_factor, 
-            self.start_y * self.zoom_factor, 
-            outline="#2563eb", 
-            width=3, 
+            canvas_x, canvas_y,
+            canvas_x, canvas_y,
+            outline="#2563eb",
+            width=3,
             tags="selection_rect"
         )
 
     def on_mouse_drag(self, event):
         """Handle mouse drag for rectangle selection"""
         if self.current_rect:
-            # Convert screen coordinates to image coordinates
-            image_x = event.x / self.zoom_factor
-            image_y = event.y / self.zoom_factor
+            # Convert window coordinates to canvas coordinates
+            canvas_x = self.canvas.canvasx(event.x)
+            canvas_y = self.canvas.canvasy(event.y)
             
             self.canvas.coords(
-                self.current_rect, 
-                self.start_x * self.zoom_factor, 
-                self.start_y * self.zoom_factor, 
-                image_x * self.zoom_factor, 
-                image_y * self.zoom_factor
+                self.current_rect,
+                self.start_x * self.zoom_factor + self.image_offset_x,
+                self.start_y * self.zoom_factor + self.image_offset_y,
+                canvas_x, canvas_y
             )
 
     def on_mouse_up(self, event):
         """Handle mouse release for rectangle selection"""
         if self.current_rect:
-            # Convert screen coordinates to image coordinates
-            image_x = event.x / self.zoom_factor
-            image_y = event.y / self.zoom_factor
+            # Convert window coordinates to canvas coordinates
+            canvas_x = self.canvas.canvasx(event.x)
+            canvas_y = self.canvas.canvasy(event.y)
             
+            # Convert canvas coordinates to image coordinates
+            image_x = (canvas_x - self.image_offset_x) / self.zoom_factor
+            image_y = (canvas_y - self.image_offset_y) / self.zoom_factor
+
             x, y = min(self.start_x, image_x), min(self.start_y, image_y)
             w, h = abs(image_x - self.start_x), abs(image_y - self.start_y)
 
