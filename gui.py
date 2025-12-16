@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 import subprocess
@@ -6,8 +7,11 @@ from PIL import Image, ImageTk
 import json
 import cv2
 import pytesseract
+import time
+import numpy as np
 from screenshot import ScreenshotMiniGUI
 from modern_styles import apply_modern_styling, create_modern_frame, create_modern_button, create_modern_label, create_modern_notebook
+from enhanced_ocr import EnhancedOCR, enhanced_ocr_extract
 
 
 class ModernTemplateGUI:
@@ -793,8 +797,9 @@ class ModernTemplateGUI:
             messagebox.showerror("❌ Error", f"Failed to save template: {str(e)}")
 
 
+
     def preview_extractions(self):
-        """Preview OCR extractions from selected areas"""
+        """Enhanced OCR extractions from selected areas with multiple preprocessing strategies"""
         if not self.image:
             messagebox.showwarning("⚠️ Warning", "Open an image first!")
             return
@@ -817,38 +822,89 @@ class ModernTemplateGUI:
             # Clear previous preview
             self.preview_text.config(state=tk.NORMAL)
             self.preview_text.delete(1.0, tk.END)
-            self.preview_text.insert(tk.END, "📋 EXTRACTION PREVIEW\n")
-            self.preview_text.insert(tk.END, "=" * 50 + "\n\n")
+            self.preview_text.insert(tk.END, "🚀 ENHANCED OCR PREVIEW\n")
+            self.preview_text.insert(tk.END, "=" * 50 + "\n")
+            self.preview_text.insert(tk.END, "Multiple preprocessing strategies enabled\n\n")
 
+            # Initialize enhanced OCR
+            ocr = EnhancedOCR(languages="eng+ind", confidence_threshold=0.6)
+            
             extracted_count = 0
+            high_confidence_count = 0
+            total_processing_time = 0
+            
             for i, field in enumerate(self.rectangles):
                 x, y, w, h = field["x"], field["y"], field["w"], field["h"]
                 crop = cv_image[y:y+h, x:x+w]
-                text = pytesseract.image_to_string(crop, lang="eng+ind").strip()
                 
-                # Modern preview with better formatting
+                # Skip if crop is too small
+                if crop.size == 0:
+                    self.preview_text.insert(tk.END, f"🔹 {field['name'].upper()}\n")
+                    self.preview_text.insert(tk.END, f"   Position: ({x}, {y}) Size: {w}x{h}\n")
+                    self.preview_text.insert(tk.END, "   ❌ Error: Empty crop region\n\n")
+                    continue
+                
+                # Run enhanced OCR
+                start_time = time.time()
+                ocr_result = ocr.extract_text(crop, debug=False)
+                processing_time = time.time() - start_time
+                total_processing_time += processing_time
+                
+                # Modern preview with enhanced formatting
                 self.preview_text.insert(tk.END, f"🔹 {field['name'].upper()}\n")
                 self.preview_text.insert(tk.END, f"   Position: ({x}, {y}) Size: {w}x{h}\n")
+                self.preview_text.insert(tk.END, f"   Strategy: {ocr_result['strategy_used']}\n")
+                self.preview_text.insert(tk.END, f"   Processing time: {processing_time:.3f}s\n")
                 
-                if text:
-                    self.preview_text.insert(tk.END, f"   Text: {text}\n")
+                if ocr_result['text']:
+                    confidence_color = "🟢" if ocr_result['confidence'] >= 0.8 else "🟡" if ocr_result['confidence'] >= 0.6 else "🔴"
+                    self.preview_text.insert(tk.END, f"   Text: {ocr_result['text']}\n")
+                    self.preview_text.insert(tk.END, f"   Confidence: {confidence_color} {ocr_result['confidence']:.3f}\n")
                     extracted_count += 1
+                    
+                    if ocr_result['confidence'] >= 0.8:
+                        high_confidence_count += 1
                 else:
                     self.preview_text.insert(tk.END, "   Text: [No text detected]\n")
+                    self.preview_text.insert(tk.END, f"   Confidence: 🔴 {ocr_result['confidence']:.3f}\n")
                     
                 self.preview_text.insert(tk.END, "\n")
 
-            # Add summary
-            self.preview_text.insert(tk.END, f"📊 SUMMARY:\n")
+            # Add enhanced summary
+            self.preview_text.insert(tk.END, f"📊 ENHANCED OCR SUMMARY:\n")
             self.preview_text.insert(tk.END, f"   Total fields: {len(self.rectangles)}\n")
             self.preview_text.insert(tk.END, f"   Text extracted: {extracted_count}\n")
+            self.preview_text.insert(tk.END, f"   High confidence (≥0.8): {high_confidence_count}\n")
             self.preview_text.insert(tk.END, f"   Success rate: {(extracted_count/len(self.rectangles)*100):.1f}%\n")
+            self.preview_text.insert(tk.END, f"   Average time per field: {(total_processing_time/len(self.rectangles)*1000):.1f}ms\n")
+            
+            # Add tips for low confidence results
+            if high_confidence_count < len(self.rectangles) * 0.5:
+                self.preview_text.insert(tk.END, f"\n💡 IMPROVEMENT TIPS:\n")
+                self.preview_text.insert(tk.END, f"   • Increase image quality/resolution\n")
+                self.preview_text.insert(tk.END, f"   • Adjust field boundaries to exclude background\n")
+                self.preview_text.insert(tk.END, f"   • Ensure good contrast between text and background\n")
+                self.preview_text.insert(tk.END, f"   • Try manual preprocessing if needed\n")
 
             self.preview_text.config(state=tk.DISABLED)
-            self.update_status("👁️ Extraction preview generated!", "#10b981")
-            messagebox.showinfo("✅ Preview", f"Extraction preview generated!\n{extracted_count}/{len(self.rectangles)} fields extracted successfully.")
+            self.update_status(f"🚀 Enhanced OCR completed! {extracted_count}/{len(self.rectangles)} fields extracted", "#10b981")
+            
+            # Show success message with detailed stats
+            message = f"Enhanced OCR completed!\n\n"
+            message += f"📊 Results:\n"
+            message += f"• Total fields: {len(self.rectangles)}\n"
+            message += f"• Successfully extracted: {extracted_count}\n"
+            message += f"• High confidence: {high_confidence_count}\n"
+            message += f"• Success rate: {(extracted_count/len(self.rectangles)*100):.1f}%\n"
+            message += f"• Average processing time: {(total_processing_time/len(self.rectangles)*1000):.1f}ms"
+            
+            messagebox.showinfo("✅ Enhanced OCR Complete", message)
+            
         except Exception as e:
-            messagebox.showerror("❌ Error", f"Failed to preview extractions: {str(e)}")
+            error_msg = f"Failed to preview extractions: {str(e)}"
+            messagebox.showerror("❌ Error", error_msg)
+            print(f"Enhanced OCR error: {e}")
+            self.update_status("❌ Enhanced OCR failed", "#ef4444")
 
 class ModernOCRGui:
     def __init__(self, root):

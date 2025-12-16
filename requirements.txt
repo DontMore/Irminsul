@@ -2,3 +2,5 @@ opencv-python-headless
 pandas
 numpy
 Pillow
+pyautogui
+pytesseract
