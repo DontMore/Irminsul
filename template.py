@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from PIL import Image, ImageTk
 import json
 import cv2
@@ -27,6 +27,15 @@ class TemplateGUI:
         # Right side: Sidebar
         self.sidebar = tk.Frame(self.paned, width=300)
         self.paned.add(self.sidebar)
+
+        tk.Label(self.sidebar, text="Fields:").pack(anchor="w", padx=5, pady=5)
+        self.fields_listbox = tk.Listbox(self.sidebar)
+        self.fields_listbox.pack(fill=tk.X, padx=5, pady=5)
+
+        buttons_frame = tk.Frame(self.sidebar)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        tk.Button(buttons_frame, text="Edit Name", command=self.edit_field_name).pack(side=tk.LEFT, padx=5)
+        tk.Button(buttons_frame, text="Delete Field", command=self.delete_field).pack(side=tk.LEFT, padx=5)
 
         tk.Label(self.sidebar, text="Extraction Preview:").pack(anchor="w", padx=5, pady=5)
         self.preview_text = tk.Text(self.sidebar, wrap=tk.WORD, state=tk.DISABLED)
@@ -94,6 +103,7 @@ class TemplateGUI:
             })
 
             print("Added:", self.rectangles[-1])
+            self.update_fields_listbox()
             self.current_rect = None
 
     def save_template(self):
@@ -112,6 +122,41 @@ class TemplateGUI:
             json.dump({"fields": self.rectangles}, f, indent=4)
 
         print("Template saved to:", save_path)
+
+    def update_fields_listbox(self):
+        self.fields_listbox.delete(0, tk.END)
+        for field in self.rectangles:
+            self.fields_listbox.insert(tk.END, field["name"])
+
+    def edit_field_name(self):
+        selection = self.fields_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Warning", "Select a field to edit!")
+            return
+        index = selection[0]
+        current_name = self.rectangles[index]["name"]
+        new_name = simpledialog.askstring("Edit Field Name", "Enter new name:", initialvalue=current_name)
+        if new_name and new_name != current_name:
+            self.rectangles[index]["name"] = new_name
+            self.update_fields_listbox()
+
+    def delete_field(self):
+        selection = self.fields_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Warning", "Select a field to delete!")
+            return
+        index = selection[0]
+        if messagebox.askyesno("Confirm Delete", f"Delete field '{self.rectangles[index]['name']}'?"):
+            del self.rectangles[index]
+            self.update_fields_listbox()
+            # Redraw canvas to remove the rectangle
+            self.canvas.delete("all")
+            if self.image:
+                self.canvas.create_image(0, 0, anchor="nw", image=self.tk_image)
+            # Redraw remaining rectangles
+            for field in self.rectangles:
+                x, y, w, h = field["x"], field["y"], field["w"], field["h"]
+                self.canvas.create_rectangle(x, y, x+w, y+h, outline="red", width=2)
 
     def preview_extractions(self):
         if not self.image:

@@ -311,6 +311,12 @@ class ModernTemplateGUI:
         # Bind selection event
         self.fields_tree.bind("<<TreeviewSelect>>", self.on_field_select)
 
+        # Bind right-click for context menu
+        self.fields_tree.bind("<Button-3>", self.show_context_menu)
+
+        # Bind double-click for edit name
+        self.fields_tree.bind("<Double-1>", self.edit_field_name)
+
     def setup_extracted_text_tab(self):
         """Setup extracted text preview tab"""
         text_frame = create_modern_frame(self.fields_notebook, padding=10)
@@ -557,6 +563,118 @@ class ModernTemplateGUI:
                         outline="#fbbf24", width=4, tags="highlight"
                     )
                     break
+
+    def show_context_menu(self, event):
+        """Show context menu for field operations"""
+        # Get the item under the cursor
+        item_id = self.fields_tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        # Select the item
+        self.fields_tree.selection_set(item_id)
+
+        # Create context menu
+        menu = tk.Menu(self.fields_tree, tearoff=0)
+        menu.add_command(label="✏️ Edit Name", command=self.edit_field_name)
+        menu.add_command(label="🗑️ Delete Field", command=self.delete_field)
+
+        # Show menu at cursor position
+        menu.post(event.x_root, event.y_root)
+
+    def edit_field_name(self, event=None):
+        """Edit the selected field's name"""
+        selection = self.fields_tree.selection()
+        if not selection:
+            return
+
+        item = self.fields_tree.item(selection[0])
+        current_name = item['values'][0]
+
+        # Create a dialog to edit the name
+        dialog = tk.Toplevel(self.fields_tree)
+        dialog.title("Edit Field Name")
+        dialog.geometry("300x120")
+        dialog.resizable(False, False)
+        dialog.transient(self.fields_tree.winfo_toplevel())
+        dialog.grab_set()
+
+        # Center the dialog
+        dialog.geometry("+{}+{}".format(
+            self.fields_tree.winfo_rootx() + 50,
+            self.fields_tree.winfo_rooty() + 50
+        ))
+
+        # Label
+        tk.Label(dialog, text="Enter new field name:", font=('Arial', 10)).pack(pady=(20, 5))
+
+        # Entry field
+        name_var = tk.StringVar(value=current_name)
+        entry = tk.Entry(dialog, textvariable=name_var, font=('Arial', 10))
+        entry.pack(pady=(0, 10), padx=20, fill=tk.X)
+        entry.select_range(0, tk.END)
+        entry.focus()
+
+        def save_name():
+            new_name = name_var.get().strip()
+            if new_name and new_name != current_name:
+                # Check if name already exists
+                if any(rect["name"] == new_name for rect in self.rectangles):
+                    messagebox.showerror("Error", f"Field name '{new_name}' already exists!")
+                    return
+
+                # Update the rectangle name
+                for rect in self.rectangles:
+                    if rect["name"] == current_name:
+                        rect["name"] = new_name
+                        break
+
+                # Update the treeview
+                self.update_field_list()
+
+                # Update status
+                self.update_status(f"✅ Field renamed: {current_name} → {new_name}", "#10b981")
+
+            dialog.destroy()
+
+        def cancel():
+            dialog.destroy()
+
+        # Buttons
+        button_frame = tk.Frame(dialog)
+        button_frame.pack(pady=(0, 10))
+
+        tk.Button(button_frame, text="Save", command=save_name, bg="#10b981", fg="white").pack(side=tk.LEFT, padx=(0, 5))
+        tk.Button(button_frame, text="Cancel", command=cancel).pack(side=tk.LEFT)
+
+        # Bind Enter key to save
+        dialog.bind('<Return>', lambda e: save_name())
+        dialog.bind('<Escape>', lambda e: cancel())
+
+    def delete_field(self):
+        """Delete the selected field"""
+        selection = self.fields_tree.selection()
+        if not selection:
+            return
+
+        item = self.fields_tree.item(selection[0])
+        field_name = item['values'][0]
+
+        # Confirm deletion
+        if not messagebox.askyesno("Delete Field", f"Are you sure you want to delete field '{field_name}'?"):
+            return
+
+        # Remove from rectangles list
+        self.rectangles = [rect for rect in self.rectangles if rect["name"] != field_name]
+
+        # Update displays
+        self.redraw_image()
+        self.update_field_list()
+        self.update_field_stats()
+        self.update_minimap()
+
+        # Update status
+        self.update_status(f"🗑️ Field deleted: {field_name}", "#ef4444")
 
     def update_field_list(self):
         """Update field list in tree view"""
