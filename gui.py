@@ -9,6 +9,7 @@ import cv2
 import pytesseract
 import time
 import numpy as np
+import pandas as pd
 from screenshot import ScreenshotMiniGUI
 from modern_styles import apply_modern_styling, create_modern_frame, create_modern_button, create_modern_label, create_modern_notebook
 from enhanced_ocr import EnhancedOCR, enhanced_ocr_extract
@@ -1036,6 +1037,7 @@ class ModernOCRGui:
         self.template = ""
         self.image_folder = "screenshots"
         self.current_template_path = ""
+        self.export_format_var = None  # Will be initialized in setup_ocr_tab
 
         os.makedirs(self.image_folder, exist_ok=True)
 
@@ -1181,69 +1183,98 @@ class ModernOCRGui:
         # Header
         header_frame = create_modern_frame(self.ocr_frame)
         header_frame.pack(fill=tk.X, pady=(20, 10))
-        
+
         create_modern_label(
-            header_frame, 
-            "🔍 OCR Processing", 
+            header_frame,
+            "🔍 OCR Processing",
             style='Modern.TLabel'
         ).pack()
 
         # Template selection section
         template_section = create_modern_frame(self.ocr_frame, padding=20)
         template_section.pack(fill=tk.X, padx=20, pady=(0, 10))
-        
+
         # Template selection row
         template_row = create_modern_frame(template_section, padding=0)
         template_row.pack(fill=tk.X, pady=(0, 10))
-        
+
         create_modern_label(
-            template_row, 
-            "📄 Template JSON:", 
+            template_row,
+            "📄 Template JSON:",
             style='Modern.TLabel'
         ).pack(side=tk.LEFT)
-        
+
         self.template_label = create_modern_label(
-            template_row, 
-            "Belum dipilih", 
+            template_row,
+            "Belum dipilih",
             style='Modern.TLabel'
         )
         self.template_label.pack(side=tk.LEFT, padx=15)
-        
+
         create_modern_button(
-            template_row, 
-            "📁 Pilih Template", 
-            self.pick_template, 
+            template_row,
+            "📁 Pilih Template",
+            self.pick_template,
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
+
+        # Export format selection section
+        export_section = create_modern_frame(self.ocr_frame, padding=20)
+        export_section.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        # Export format row
+        export_row = create_modern_frame(export_section, padding=0)
+        export_row.pack(fill=tk.X, pady=(0, 10))
+
+        create_modern_label(
+            export_row,
+            "📊 Export Format:",
+            style='Modern.TLabel'
+        ).pack(side=tk.LEFT)
+
+        # Initialize export format variable
+        self.export_format_var = tk.StringVar(value="CSV")
+
+        # Export format dropdown
+        export_options = ["CSV", "Excel"]
+        self.export_format_combo = ttk.Combobox(
+            export_row,
+            textvariable=self.export_format_var,
+            values=export_options,
+            state="readonly",
+            font=('Consolas', 9),
+            width=10
+        )
+        self.export_format_combo.pack(side=tk.LEFT, padx=15)
 
         # Action buttons section
         action_section = create_modern_frame(self.ocr_frame, padding=20)
         action_section.pack(fill=tk.X, padx=20, pady=(10, 20))
-        
+
         create_modern_button(
-            action_section, 
-            "🚀 Mulai OCR", 
-            self.run_ocr, 
+            action_section,
+            "🚀 Mulai OCR",
+            self.run_ocr,
             style='Accent.TButton'
         ).pack(pady=10)
 
         # Log section
         log_section = create_modern_frame(self.ocr_frame, padding=20)
         log_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-        
+
         create_modern_label(
-            log_section, 
-            "📊 Process Log:", 
+            log_section,
+            "📊 Process Log:",
             style='Modern.TLabel'
         ).pack(anchor="w", pady=(0, 10))
-        
+
         # Modern log widget
         log_frame = tk.Frame(log_section, bg='white')
         log_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         self.log = scrolledtext.ScrolledText(
-            log_frame, 
-            width=60, 
+            log_frame,
+            width=60,
             height=10,
             font=('Consolas', 9),
             bg='#f8fafc',
@@ -1254,7 +1285,7 @@ class ModernOCRGui:
             relief='solid',
             borderwidth=1
         )
-        
+
         self.log.pack(fill=tk.BOTH, expand=True)
 
 
@@ -1311,9 +1342,12 @@ class ModernOCRGui:
         try:
             # Get the directory of the template file
             template_dir = os.path.dirname(self.current_template_path)
-            
+
             # Ensure output folder exists
             os.makedirs(self.image_folder, exist_ok=True)
+
+            # Get selected export format
+            export_format = self.export_format_var.get()
 
             cmd = [
                 "docker", "run", "--rm",
@@ -1327,23 +1361,44 @@ class ModernOCRGui:
                 self.log.insert(tk.END, "🚀 Menjalankan OCR di Docker...\n")
                 self.log.insert(tk.END, f"📁 Template: {os.path.basename(self.current_template_path)}\n")
                 self.log.insert(tk.END, f"📁 Output folder: {self.image_folder}\n")
+                self.log.insert(tk.END, f"📊 Export format: {export_format}\n")
                 self.log.see(tk.END)
-            
+
             self.root.update()
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True)
-            
+
             if result.returncode == 0:
-                if hasattr(self, 'log'):
-                    self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
-                    self.log.see(tk.END)
-                messagebox.showinfo("✅ Selesai", "OCR selesai!")
+                # Handle export format conversion
+                csv_path = os.path.join(template_dir, "hasil_ocr.csv")
+
+                if export_format == "Excel" and os.path.exists(csv_path):
+                    try:
+                        # Convert CSV to Excel
+                        df = pd.read_csv(csv_path)
+                        excel_path = os.path.join(template_dir, "hasil_ocr.xlsx")
+                        df.to_excel(excel_path, index=False)
+
+                        if hasattr(self, 'log'):
+                            self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.xlsx\n")
+                            self.log.see(tk.END)
+                        messagebox.showinfo("✅ Selesai", f"OCR selesai! Hasil tersimpan sebagai Excel: hasil_ocr.xlsx")
+                    except Exception as convert_error:
+                        if hasattr(self, 'log'):
+                            self.log.insert(tk.END, f"⚠️ CSV tersimpan, tapi konversi Excel gagal: {str(convert_error)}\n")
+                            self.log.see(tk.END)
+                        messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV (konversi Excel gagal).")
+                else:
+                    if hasattr(self, 'log'):
+                        self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
+                        self.log.see(tk.END)
+                    messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV.")
             else:
                 if hasattr(self, 'log'):
                     self.log.insert(tk.END, f"❌ Error: {result.stderr}\n")
                     self.log.see(tk.END)
                 messagebox.showerror("❌ Error", f"OCR gagal: {result.stderr}")
-                
+
         except FileNotFoundError:
             messagebox.showerror("❌ Error", "Docker tidak ditemukan. Pastikan Docker sudah terinstall dan running.")
         except Exception as e:

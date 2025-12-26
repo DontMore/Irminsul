@@ -58,11 +58,12 @@ def run_ocr_preview(input_data):
     return results
 
 
-def run_ocr(template_path, image_folder, output_dir="/data"):
+def run_ocr(template_path, image_folder, output_dir="/data", output_format="csv"):
     print("=== OCR BATCH START ===")
     print(f"Template path : {template_path}")
     print(f"Image folder  : {image_folder}")
     print(f"Output dir    : {output_dir}")
+    print(f"Output format : {output_format}")
 =======
 class OCRGuiApp:
     def __init__(self, root):
@@ -167,10 +168,15 @@ class OCRGuiApp:
     if not rows:
         print("⚠️ Tidak ada data OCR yang dihasilkan")
 
-    # --- Simpan CSV ke volume ---
-    output_path = os.path.join(output_dir, "hasil_ocr.csv")
+    # --- Simpan output berdasarkan format ---
     df = pd.DataFrame(rows)
-    df.to_csv(output_path, index=False, encoding="utf-8")
+
+    if output_format.lower() == "excel":
+        output_path = os.path.join(output_dir, "hasil_ocr.xlsx")
+        df.to_excel(output_path, index=False, engine='openpyxl')
+    else:  # default to csv
+        output_path = os.path.join(output_dir, "hasil_ocr.csv")
+        df.to_csv(output_path, index=False, encoding="utf-8")
 
 <<<<<<< HEAD
     print(f"=== OCR SELESAI ===")
@@ -206,11 +212,13 @@ class OCRGuiApp:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python extract.py template.json image_folder")
+    if len(sys.argv) < 4:
+        print("Usage: python extract.py template.json image_folder output_format")
+        print("output_format: csv or excel")
         sys.exit(1)
 
     template = sys.argv[1]
     folder = sys.argv[2]
+    output_format = sys.argv[3] if len(sys.argv) > 3 else "csv"
 
-    run_ocr(template, folder)
+    run_ocr(template, folder, output_format=output_format)
