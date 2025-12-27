@@ -1030,13 +1030,15 @@ class ModernOCRGui:
         self.root = root
         self.root.title("🚀 Modern OCR GUI - Screenshot + Template Creator + Docker")
         self.root.geometry("1200x800")
-        
+
         # Apply modern styling
         self.modern_styles = apply_modern_styling(root)
-        
+
         self.template = ""
         self.image_folder = "screenshots"
         self.current_template_path = ""
+        self.input_folder_path = ""
+        self.output_folder_path = ""
         self.export_format_var = None  # Will be initialized in setup_ocr_tab
 
         os.makedirs(self.image_folder, exist_ok=True)
@@ -1218,6 +1220,62 @@ class ModernOCRGui:
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
 
+        # Input folder selection section
+        input_section = create_modern_frame(self.ocr_frame, padding=20)
+        input_section.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        # Input folder selection row
+        input_row = create_modern_frame(input_section, padding=0)
+        input_row.pack(fill=tk.X, pady=(0, 10))
+
+        create_modern_label(
+            input_row,
+            "📁 Folder Input Gambar:",
+            style='Modern.TLabel'
+        ).pack(side=tk.LEFT)
+
+        self.input_folder_label = create_modern_label(
+            input_row,
+            "Belum dipilih",
+            style='Modern.TLabel'
+        )
+        self.input_folder_label.pack(side=tk.LEFT, padx=15)
+
+        create_modern_button(
+            input_row,
+            "📂 Pilih Folder Input",
+            self.pick_input_folder,
+            style='Secondary.TButton'
+        ).pack(side=tk.RIGHT)
+
+        # Output folder selection section
+        output_section = create_modern_frame(self.ocr_frame, padding=20)
+        output_section.pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        # Output folder selection row
+        output_row = create_modern_frame(output_section, padding=0)
+        output_row.pack(fill=tk.X, pady=(0, 10))
+
+        create_modern_label(
+            output_row,
+            "📁 Folder Output Hasil:",
+            style='Modern.TLabel'
+        ).pack(side=tk.LEFT)
+
+        self.output_folder_label = create_modern_label(
+            output_row,
+            "Belum dipilih",
+            style='Modern.TLabel'
+        )
+        self.output_folder_label.pack(side=tk.LEFT, padx=15)
+
+        create_modern_button(
+            output_row,
+            "📂 Pilih Folder Output",
+            self.pick_output_folder,
+            style='Secondary.TButton'
+        ).pack(side=tk.RIGHT)
+
         # Export format selection section
         export_section = create_modern_frame(self.ocr_frame, padding=20)
         export_section.pack(fill=tk.X, padx=20, pady=(0, 10))
@@ -1332,6 +1390,24 @@ class ModernOCRGui:
             self.template_label.config(text=os.path.basename(self.template), foreground="#10b981")
             if hasattr(self, 'log'):
                 self.log.insert(tk.END, f"📁 Template dipilih: {self.template}\n")
+                self.log.see(tk.END)
+
+    def pick_input_folder(self):
+        folder_path = filedialog.askdirectory(title="Pilih Folder Input Gambar")
+        if folder_path:
+            self.input_folder_path = folder_path
+            self.input_folder_label.config(text=os.path.basename(folder_path), foreground="#10b981")
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"📁 Folder input dipilih: {folder_path}\n")
+                self.log.see(tk.END)
+
+    def pick_output_folder(self):
+        folder_path = filedialog.askdirectory(title="Pilih Folder Output Hasil OCR")
+        if folder_path:
+            self.output_folder_path = folder_path
+            self.output_folder_label.config(text=os.path.basename(folder_path), foreground="#10b981")
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"📁 Folder output dipilih: {folder_path}\n")
                 self.log.see(tk.END)
 
     def run_ocr(self):

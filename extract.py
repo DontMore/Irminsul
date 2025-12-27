@@ -213,12 +213,13 @@ class OCRGuiApp:
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
-        print("Usage: python extract.py template.json image_folder output_format")
+        print("Usage: python extract.py template.json image_folder output_dir output_format")
         print("output_format: csv or excel")
         sys.exit(1)
 
     template = sys.argv[1]
     folder = sys.argv[2]
-    output_format = sys.argv[3] if len(sys.argv) > 3 else "csv"
+    output_dir = sys.argv[3] if len(sys.argv) > 3 else "/data"
+    output_format = sys.argv[4] if len(sys.argv) > 4 else "csv"
 
-    run_ocr(template, folder, output_format=output_format)
+    run_ocr(template, folder, output_dir=output_dir, output_format=output_format)
