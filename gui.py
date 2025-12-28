@@ -1604,14 +1604,17 @@ class ModernOCRGui:
             "🔍 OCR Processing",
             style='Modern.TLabel'
         ).pack()
+        # Content area split into left (controls) and right (preview + log)
+        content_frame = tk.Frame(self.ocr_frame, bg='white')
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 10))
 
-        # Template selection section
-        template_section = create_modern_frame(self.ocr_frame, padding=20)
-        template_section.pack(fill=tk.X, padx=20, pady=(0, 10))
+        # Left panel: selections and actions
+        left_panel = create_modern_frame(content_frame, padding=10)
+        left_panel.pack(side=tk.LEFT, fill=tk.Y)
 
-        # Template selection row
-        template_row = create_modern_frame(template_section, padding=0)
-        template_row.pack(fill=tk.X, pady=(0, 10))
+        # Template selection
+        template_row = create_modern_frame(left_panel, padding=5)
+        template_row.pack(fill=tk.X, pady=(0, 8))
 
         create_modern_label(
             template_row,
@@ -1624,7 +1627,7 @@ class ModernOCRGui:
             "Belum dipilih",
             style='Modern.TLabel'
         )
-        self.template_label.pack(side=tk.LEFT, padx=15)
+        self.template_label.pack(side=tk.LEFT, padx=10)
 
         create_modern_button(
             template_row,
@@ -1633,17 +1636,13 @@ class ModernOCRGui:
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
 
-        # Input folder selection section
-        input_section = create_modern_frame(self.ocr_frame, padding=20)
-        input_section.pack(fill=tk.X, padx=20, pady=(0, 10))
-
-        # Input folder selection row
-        input_row = create_modern_frame(input_section, padding=0)
-        input_row.pack(fill=tk.X, pady=(0, 10))
+        # Input folder selection
+        input_row = create_modern_frame(left_panel, padding=5)
+        input_row.pack(fill=tk.X, pady=(0, 8))
 
         create_modern_label(
             input_row,
-            "📁 Folder Input Gambar:",
+            "📁 Folder Input:",
             style='Modern.TLabel'
         ).pack(side=tk.LEFT)
 
@@ -1652,49 +1651,22 @@ class ModernOCRGui:
             "Belum dipilih",
             style='Modern.TLabel'
         )
-        self.input_folder_label.pack(side=tk.LEFT, padx=15)
+        self.input_folder_label.pack(side=tk.LEFT, padx=10)
 
         create_modern_button(
             input_row,
-            "📂 Pilih Folder Input",
+            "📂 Pilih",
             self.pick_input_folder,
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
 
-        # Folder structure display for input images
-        tree_section = create_modern_frame(input_section, padding=5)
-        tree_section.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
-
-        create_modern_label(
-            tree_section,
-            "🗂️ Struktur Folder Input:",
-            style='Modern.TLabel'
-        ).pack(anchor="w")
-
-        tree_frame = tk.Frame(tree_section, bg='white')
-        tree_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
-
-        self.input_tree = ttk.Treeview(tree_frame, show='tree')
-        tree_v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.input_tree.yview)
-        self.input_tree.configure(yscrollcommand=tree_v_scroll.set)
-
-        self.input_tree.grid(row=0, column=0, sticky="nsew")
-        tree_v_scroll.grid(row=0, column=1, sticky="ns")
-
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
-
-        # Output folder selection section
-        output_section = create_modern_frame(self.ocr_frame, padding=20)
-        output_section.pack(fill=tk.X, padx=20, pady=(0, 10))
-
-        # Output folder selection row
-        output_row = create_modern_frame(output_section, padding=0)
-        output_row.pack(fill=tk.X, pady=(0, 10))
+        # Output folder selection
+        output_row = create_modern_frame(left_panel, padding=5)
+        output_row.pack(fill=tk.X, pady=(0, 8))
 
         create_modern_label(
             output_row,
-            "📁 Folder Output Hasil:",
+            "📁 Folder Output:",
             style='Modern.TLabel'
         ).pack(side=tk.LEFT)
 
@@ -1703,73 +1675,67 @@ class ModernOCRGui:
             "Belum dipilih",
             style='Modern.TLabel'
         )
-        self.output_folder_label.pack(side=tk.LEFT, padx=15)
+        self.output_folder_label.pack(side=tk.LEFT, padx=10)
 
         create_modern_button(
             output_row,
-            "📂 Pilih Folder Output",
+            "📂 Pilih",
             self.pick_output_folder,
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
 
-        # Export format selection section
-        export_section = create_modern_frame(self.ocr_frame, padding=20)
-        export_section.pack(fill=tk.X, padx=20, pady=(0, 10))
-
-        # Export format row
-        export_row = create_modern_frame(export_section, padding=0)
-        export_row.pack(fill=tk.X, pady=(0, 10))
-
-        create_modern_label(
-            export_row,
-            "📊 Export Format:",
-            style='Modern.TLabel'
-        ).pack(side=tk.LEFT)
-
-        # Initialize export format variable
+        # Export format
+        export_row = create_modern_frame(left_panel, padding=5)
+        export_row.pack(fill=tk.X, pady=(0, 8))
+        create_modern_label(export_row, "📊 Export:", style='Modern.TLabel').pack(side=tk.LEFT)
         self.export_format_var = tk.StringVar(value="CSV")
-
-        # Export format dropdown
-        export_options = ["CSV", "Excel"]
         self.export_format_combo = ttk.Combobox(
             export_row,
             textvariable=self.export_format_var,
-            values=export_options,
+            values=["CSV", "Excel"],
             state="readonly",
             font=('Consolas', 9),
             width=10
         )
-        self.export_format_combo.pack(side=tk.LEFT, padx=15)
+        self.export_format_combo.pack(side=tk.LEFT, padx=10)
 
-        # Action buttons section
-        action_section = create_modern_frame(self.ocr_frame, padding=20)
-        action_section.pack(fill=tk.X, padx=20, pady=(10, 20))
-
+        # Action buttons
+        action_row = create_modern_frame(left_panel, padding=5)
+        action_row.pack(fill=tk.X, pady=(10, 0))
         create_modern_button(
-            action_section,
+            action_row,
             "🚀 Mulai OCR",
             self.run_ocr,
             style='Accent.TButton'
-        ).pack(pady=10)
+        ).pack(fill=tk.X)
 
-        # Log section
-        log_section = create_modern_frame(self.ocr_frame, padding=20)
-        log_section.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+        # Right panel: folder structure and logs
+        right_panel = create_modern_frame(content_frame, padding=10)
+        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        create_modern_label(
-            log_section,
-            "📊 Process Log:",
-            style='Modern.TLabel'
-        ).pack(anchor="w", pady=(0, 10))
+        # Folder structure (top)
+        tree_section = create_modern_frame(right_panel, padding=5)
+        tree_section.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        create_modern_label(tree_section, "🗂️ Struktur Folder Input:", style='Modern.TLabel').pack(anchor='w')
+        tree_frame = tk.Frame(tree_section, bg='white')
+        tree_frame.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
 
-        # Modern log widget
+        self.input_tree = ttk.Treeview(tree_frame, show='tree')
+        tree_v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.input_tree.yview)
+        self.input_tree.configure(yscrollcommand=tree_v_scroll.set)
+        self.input_tree.grid(row=0, column=0, sticky="nsew")
+        tree_v_scroll.grid(row=0, column=1, sticky="ns")
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
+        # Process log (bottom)
+        log_section = create_modern_frame(right_panel, padding=5)
+        log_section.pack(fill=tk.BOTH, expand=True)
+        create_modern_label(log_section, "📊 Process Log:", style='Modern.TLabel').pack(anchor='w', pady=(0, 8))
         log_frame = tk.Frame(log_section, bg='white')
         log_frame.pack(fill=tk.BOTH, expand=True)
-
         self.log = scrolledtext.ScrolledText(
             log_frame,
-            width=60,
-            height=10,
             font=('Consolas', 9),
             bg='#f8fafc',
             fg='#1e293b',
@@ -1779,7 +1745,6 @@ class ModernOCRGui:
             relief='solid',
             borderwidth=1
         )
-
         self.log.pack(fill=tk.BOTH, expand=True)
 
 
