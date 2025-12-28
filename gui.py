@@ -1,4 +1,16 @@
 
+# Modern OCR GUI Application
+# This module provides a complete GUI for OCR processing with three main functionalities:
+# 1. Screenshot capture with customizable output folder
+# 2. Template creator for defining text extraction areas with advanced zoom and navigation
+# 3. OCR processing with Docker integration and multiple export formats
+
+# Modern OCR GUI Application
+# This module provides a complete GUI for OCR processing with three main functionalities:
+# 1. Screenshot capture with customizable output folder
+# 2. Template creator for defining text extraction areas with advanced zoom and navigation
+# 3. OCR processing with Docker integration and multiple export formats
+
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 import subprocess
@@ -16,31 +28,373 @@ from enhanced_ocr import EnhancedOCR, enhanced_ocr_extract
 
 
 class ModernTemplateGUI:
+    """Template Creator GUI Class
+    
+    This class provides an advanced interface for creating OCR templates by:
+    - Loading and displaying images with zoom and pan capabilities
+    - Allowing users to select text extraction areas with drag-and-drop
+    - Providing real-time OCR preview with enhanced text recognition
+    - Supporting multi-tabbed interface for field management and statistics
+    - Including mini-map for easy navigation of large images
+    - Exporting templates as JSON configuration files
+    """
     def __init__(self, parent_frame):
+        """Initialize the template GUI with all required components"""
         self.parent_frame = parent_frame
-        self.image = None
-        self.tk_image = None
-        self.original_image = None
-        self.rectangles = []
-        self.start_x = None
+        self.image = None  # PIL Image object
+        self.tk_image = None  # Tkinter PhotoImage for display
+        self.original_image = None  # Original PIL Image for OCR processing
+        self.rectangles = []  # List of selected field areas
+        self.start_x = None  # Mouse drag start coordinates
         self.start_y = None
-        self.current_rect = None
-        self.preview_text = None
+        self.current_rect = None  # Current selection rectangle
+        self.preview_text = None  # Text widget for OCR preview
         
         # Zoom and navigation variables
-        self.zoom_factor = 1.0
-        self.min_zoom = 0.1
-        self.max_zoom = 5.0
-        self.image_offset_x = 0  # Image top-left position on canvas
-        self.image_offset_y = 0
-        self.viewport_width = 600
-        self.viewport_height = 400
+        self.zoom_factor = 1.0  # Current zoom level (1.0 = 100%)
+        self.min_zoom = 0.1  # Minimum zoom (10%)
+        self.max_zoom = 5.0  # Maximum zoom (500%)
+        self.image_offset_x = 0  # Image position on canvas X
+        self.image_offset_y = 0  # Image position on canvas Y
+        self.viewport_width = 600  # Default viewport width
+        self.viewport_height = 400  # Default viewport height
         
         # Mini-map variables
-        self.minimap_ratio = 0.15  # 15% of viewport
-        self.minimap_canvas = None
+        self.minimap_ratio = 0.15  # Mini-map size relative to viewport (15%)
+        self.minimap_canvas = None  # Canvas widget for mini-map
         
         self.setup_ui()
+
+    def setup_ui(self):
+        """Setup the complete user interface with modern styling"""
+        # Main container with modern padding
+        main_container = create_modern_frame(self.parent_frame, padding=15)
+        main_container.pack(fill=tk.BOTH, expand=True)
+
+        # Top control panel with zoom controls
+        control_panel = create_modern_frame(main_container, padding=10)
+        control_panel.pack(fill=tk.X, pady=(0, 15))
+        
+        # Left controls: Open Image
+        left_controls = create_modern_frame(control_panel, padding=0)
+        left_controls.pack(side=tk.LEFT)
+        
+        create_modern_button(
+            left_controls, 
+            "📁 Open Image", 
+            self.open_image, 
+            style='Modern.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        # Center controls: Zoom controls
+        center_controls = create_modern_frame(control_panel, padding=0)
+        center_controls.pack(side=tk.LEFT, expand=True)
+        
+        # Zoom level label
+        self.zoom_label = create_modern_label(
+            center_controls, 
+            "Zoom: 100%", 
+            style='Modern.TLabel'
+        )
+        self.zoom_label.pack(side=tk.LEFT, padx=(20, 10))
+        
+        # Zoom controls
+        create_modern_button(
+            center_controls, 
+            "🔍+", 
+            lambda: self.zoom_in(), 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        create_modern_button(
+            center_controls, 
+            "🔍-", 
+            lambda: self.zoom_out(), 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 5))
+        
+        create_modern_button(
+            center_controls, 
+            "📐 Fit", 
+            lambda: self.fit_to_screen(), 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Right controls: Action buttons
+        right_controls = create_modern_frame(control_panel, padding=0)
+        right_controls.pack(side=tk.RIGHT)
+
+
+        create_modern_button(
+            right_controls, 
+            "⛶ Full Screen", 
+            self.toggle_fullscreen, 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        create_modern_button(
+            right_controls, 
+            "👁️ Preview", 
+            self.preview_extractions, 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        create_modern_button(
+            right_controls, 
+            "💾 Save Template", 
+            self.save_template, 
+            style='Accent.TButton'
+        ).pack(side=tk.LEFT)
+
+        # Main content area: Paned window for image and fields
+        self.paned = tk.PanedWindow(main_container, orient=tk.HORIZONTAL, bg='white', sashrelief=tk.RAISED, sashwidth=2)
+        self.paned.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+
+        # Left side: Image viewport with scrollbars
+        self.viewport_frame = create_modern_frame(self.paned, padding=0)
+        self.paned.add(self.viewport_frame, minsize=500)
+
+        # Image canvas with scrollbars
+        self.setup_image_viewport()
+
+        # Right side: Fields panel with tabs
+        self.fields_panel = create_modern_frame(self.paned, padding=15)
+        self.paned.add(self.fields_panel, minsize=350)
+        
+        self.setup_fields_panel()
+
+
+        # Status bar
+        self.status_label = create_modern_label(
+            main_container, 
+            "Pilih 'Open Image' untuk memulai • Drag untuk memilih area • Scroll untuk zoom", 
+            style='Modern.TLabel'
+        )
+        self.status_label.pack(side=tk.BOTTOM, pady=(10, 0))
+
+        # Bind events
+        self.bind_canvas_events()
+
+    def bind_canvas_events(self):
+        """Bind all interactive events to the canvas for user interaction"""
+        # Mouse events for rectangle selection
+        self.canvas.bind("<ButtonPress-1>", self.on_mouse_down)
+        self.canvas.bind("<B1-Motion>", self.on_mouse_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_mouse_up)
+        
+        # Mouse wheel for zoom
+        self.canvas.bind("<MouseWheel>", self.on_mousewheel)
+        self.canvas.bind("<Button-4>", self.on_mousewheel)  # Linux scroll up
+        self.canvas.bind("<Button-5>", self.on_mousewheel)  # Linux scroll down
+        
+
+        # Keyboard events
+        self.canvas.bind("<KeyPress-plus>", lambda e: self.zoom_in())
+        self.canvas.bind("<KeyPress-minus>", lambda e: self.zoom_out())
+        self.canvas.bind("<KeyPress-f>", lambda e: self.fit_to_screen())
+        self.parent_frame.winfo_toplevel().bind("<Escape>", lambda e: self.exit_fullscreen())
+        
+        # Focus canvas to receive keyboard events
+        self.canvas.focus_set()
+
+    def on_mousewheel(self, event):
+        """Handle mouse wheel events for zoom functionality"""
+        if not self.image:
+            return
+            
+        if event.delta > 0 or event.num == 4:  # Scroll up
+            self.zoom_in()
+        elif event.delta < 0 or event.num == 5:  # Scroll down
+            self.zoom_out()
+
+    def setup_image_viewport(self):
+        """Setup the image viewport with canvas, scrollbars, and mini-map"""
+        # Main canvas frame
+        canvas_frame = tk.Frame(self.viewport_frame, bg='white')
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+
+        # Canvas with scrollbars - FIXED: Remove border interference
+        self.canvas = tk.Canvas(
+            canvas_frame,
+            cursor="cross",
+            bg="white",
+            highlightthickness=0,  # Remove border to prevent interference
+            highlightbackground="white"
+        )
+        
+        # Configure canvas scrollregion immediately
+        self.canvas.configure(scrollregion=(0, 0, 1000, 800))
+        
+        # Scrollbars
+        v_scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        h_scrollbar = ttk.Scrollbar(canvas_frame, orient="horizontal", command=self.canvas.xview)
+        
+        self.canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        # Grid layout
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        
+        canvas_frame.grid_rowconfigure(0, weight=1)
+        canvas_frame.grid_columnconfigure(0, weight=1)
+        
+        # Mini-map frame
+        minimap_frame = create_modern_frame(self.viewport_frame, padding=5)
+        minimap_frame.pack(fill=tk.X, side=tk.BOTTOM)
+        
+        create_modern_label(
+            minimap_frame, 
+            "🗺️ Mini-map", 
+            style='Modern.TLabel'
+        ).pack(anchor="w")
+        
+        self.minimap_canvas = tk.Canvas(
+            minimap_frame,
+            height=60,
+            bg="white",
+            highlightthickness=1,
+            highlightbackground="#e2e8f0"
+        )
+        self.minimap_canvas.pack(fill=tk.X, pady=(5, 0))
+
+    def setup_fields_panel(self):
+        """Setup the fields management panel with tabbed interface"""
+        # Header
+        header_frame = create_modern_frame(self.fields_panel, padding=0)
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        create_modern_label(
+            header_frame, 
+            "📊 Template Fields", 
+            style='Modern.TLabel'
+        ).pack(anchor="w")
+        
+        # Tabbed interface for different views
+        self.fields_notebook = create_modern_notebook(self.fields_panel)
+        self.fields_notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Tab 1: Field List (Table)
+        self.setup_field_list_tab()
+        
+        # Tab 2: Extracted Text Preview
+        self.setup_extracted_text_tab()
+        
+        # Tab 3: Field Statistics
+        self.setup_field_stats_tab()
+
+    def setup_field_list_tab(self):
+        """Setup field list as interactive table with context menu"""
+        field_list_frame = create_modern_frame(self.fields_notebook, padding=10)
+        self.fields_notebook.add(field_list_frame, text="📋 Fields List")
+        
+        # Field count label
+        self.field_count_label = create_modern_label(
+            field_list_frame, 
+            "No fields selected", 
+            style='Modern.TLabel'
+        )
+        self.field_count_label.pack(anchor="w", pady=(0, 10))
+        
+        # Treeview for field information
+        tree_frame = tk.Frame(field_list_frame, bg='white')
+        tree_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Create Treeview with scrollbars
+        columns = ("Name", "X", "Y", "W", "H")
+        self.fields_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=10)
+        
+        # Configure columns
+        self.fields_tree.heading("Name", text="Field Name")
+        self.fields_tree.heading("X", text="X")
+        self.fields_tree.heading("Y", text="Y")
+        self.fields_tree.heading("W", text="Width")
+        self.fields_tree.heading("H", text="Height")
+        
+        # Column widths
+        self.fields_tree.column("Name", width=80)
+        self.fields_tree.column("X", width=40)
+        self.fields_tree.column("Y", width=40)
+        self.fields_tree.column("W", width=50)
+        self.fields_tree.column("H", width=50)
+        
+        # Scrollbars for treeview
+        tree_v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.fields_tree.yview)
+        tree_h_scroll = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.fields_tree.xview)
+        self.fields_tree.configure(yscrollcommand=tree_v_scroll.set, xscrollcommand=tree_h_scroll.set)
+        
+        # Grid layout
+        self.fields_tree.grid(row=0, column=0, sticky="nsew")
+        tree_v_scroll.grid(row=0, column=1, sticky="ns")
+        tree_h_scroll.grid(row=1, column=0, sticky="ew")
+        
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+        
+        # Bind selection event
+        self.fields_tree.bind("<<TreeviewSelect>>", self.on_field_select)
+
+        # Bind right-click for context menu
+        self.fields_tree.bind("<Button-3>", self.show_context_menu)
+
+        # Bind double-click for edit name
+        self.fields_tree.bind("<Double-1>", self.edit_field_name)
+
+    def setup_extracted_text_tab(self):
+        """Setup extracted text preview tab with scrollable text area"""
+        text_frame = create_modern_frame(self.fields_notebook, padding=10)
+        self.fields_notebook.add(text_frame, text="👁️ Extracted Text")
+        
+        # Create text widget with scrollbar
+        text_widget_frame = tk.Frame(text_frame, bg='white')
+        text_widget_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.preview_text = tk.Text(
+            text_widget_frame, 
+            wrap=tk.WORD, 
+            state=tk.DISABLED, 
+            font=('Consolas', 9),
+            bg='#f8fafc',
+            fg='#1e293b',
+            insertbackground='#2563eb',
+            selectbackground='#2563eb',
+            selectforeground='white',
+            relief='solid',
+            borderwidth=1
+        )
+        
+        text_scrollbar = ttk.Scrollbar(text_widget_frame, orient="vertical", command=self.preview_text.yview)
+        self.preview_text.config(yscrollcommand=text_scrollbar.set)
+        
+        self.preview_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        text_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+    def setup_field_stats_tab(self):
+        """Setup field statistics tab with comprehensive analysis"""
+        stats_frame = create_modern_frame(self.fields_notebook, padding=10)
+        self.fields_notebook.add(stats_frame, text="📈 Statistics")
+        
+        # Statistics content
+        self.stats_text = tk.Text(
+            stats_frame, 
+            wrap=tk.WORD, 
+            state=tk.DISABLED, 
+            font=('Consolas', 9),
+            bg='#f8fafc',
+            fg='#1e293b',
+            relief='solid',
+            borderwidth=1
+        )
+        
+        stats_scrollbar = ttk.Scrollbar(stats_frame, orient="vertical", command=self.stats_text.yview)
+        self.stats_text.config(yscrollcommand=stats_scrollbar.set)
+        
+        self.stats_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        stats_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Initialize stats display
+        self.update_field_stats()
 
 
     def setup_ui(self):
@@ -376,22 +730,27 @@ class ModernTemplateGUI:
 
 
     def update_status(self, message, color="#64748b"):
-        """Update status with modern styling"""
+        """Update status bar message with modern styling
+        
+        Args:
+            message (str): Status message to display
+            color (str): Color code for the text
+        """
         self.status_label.config(text=message, foreground=color)
 
     def toggle_fullscreen(self):
-        """Toggle fullscreen mode"""
+        """Toggle fullscreen mode for better image viewing experience"""
         root = self.parent_frame.winfo_toplevel()
         is_fullscreen = root.attributes("-fullscreen")
         root.attributes("-fullscreen", not is_fullscreen)
 
     def exit_fullscreen(self):
-        """Exit fullscreen mode"""
+        """Exit fullscreen mode using Escape key"""
         root = self.parent_frame.winfo_toplevel()
         root.attributes("-fullscreen", False)
 
     def zoom_in(self):
-        """Zoom in the image"""
+        """Zoom in on the image with smooth scaling"""
         if self.image:
             self.zoom_factor = min(self.zoom_factor * 1.2, self.max_zoom)
             self.update_zoom_display()
@@ -399,7 +758,7 @@ class ModernTemplateGUI:
             self.update_minimap()
 
     def zoom_out(self):
-        """Zoom out the image"""
+        """Zoom out from the image with smooth scaling"""
         if self.image:
             self.zoom_factor = max(self.zoom_factor / 1.2, self.min_zoom)
             self.update_zoom_display()
@@ -407,7 +766,7 @@ class ModernTemplateGUI:
             self.update_minimap()
 
     def fit_to_screen(self):
-        """Fit image to screen"""
+        """Automatically fit image to current viewport size"""
         if self.image and self.canvas:
             # Calculate fit zoom based on canvas size
             canvas_width = self.canvas.winfo_width()
@@ -423,13 +782,20 @@ class ModernTemplateGUI:
                 self.update_minimap()
 
     def update_zoom_display(self):
-        """Update zoom level display"""
+        """Update the zoom level indicator in the control panel"""
         zoom_percent = int(self.zoom_factor * 100)
         self.zoom_label.config(text=f"Zoom: {zoom_percent}%")
 
 
     def redraw_image(self):
-        """Redraw image with current zoom level"""
+        """Redraw the image with current zoom level and position
+        
+        This method handles:
+        - Image resizing based on zoom factor
+        - Proper positioning and centering
+        - Scroll region calculation
+        - Rectangle redrawing for selected areas
+        """
         if not self.image:
             return
             
@@ -439,7 +805,7 @@ class ModernTemplateGUI:
         new_width = int(self.image.width * self.zoom_factor)
         new_height = int(self.image.height * self.zoom_factor)
         
-        # Resize image for display
+        # Resize image for display using high-quality resampling
         display_image = self.image.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         # CRITICAL: Store PhotoImage as instance variable to prevent garbage collection
@@ -480,30 +846,32 @@ class ModernTemplateGUI:
         self.canvas.configure(scrollregion=(0, 0, scroll_width, scroll_height))
 
     def redraw_rectangles(self):
-        """Redraw all rectangles with current zoom"""
+        """Redraw all selected field rectangles with current zoom level"""
         if not self.rectangles:
             return
 
         for rect in self.rectangles:
+            # Calculate rectangle position and size based on zoom
             x = int(rect["x"] * self.zoom_factor + self.image_offset_x)
             y = int(rect["y"] * self.zoom_factor + self.image_offset_y)
             w = int(rect["w"] * self.zoom_factor)
             h = int(rect["h"] * self.zoom_factor)
 
+            # Draw rectangle with modern styling
             self.canvas.create_rectangle(
                 x, y, x + w, y + h,
                 outline="#2563eb", width=2, tags="field_rect"
             )
 
     def update_minimap(self):
-        """Update mini-map display"""
+        """Update the mini-map for easy navigation of large images"""
         if not self.minimap_canvas or not self.image:
             return
             
         # Clear minimap
         self.minimap_canvas.delete("all")
         
-        # Calculate minimap size
+        # Calculate minimap size with fallback
         minimap_width = self.minimap_canvas.winfo_width()
         minimap_height = self.minimap_canvas.winfo_height()
         
@@ -528,7 +896,7 @@ class ModernTemplateGUI:
             outline="#2563eb", width=2, tags="minimap_border"
         )
         
-        # Draw rectangles
+        # Draw rectangles on minimap
         for rect in self.rectangles:
             mx = x + int(rect["x"] * minimap_scale)
             my = y + int(rect["y"] * minimap_scale)
@@ -541,7 +909,11 @@ class ModernTemplateGUI:
             )
 
     def on_field_select(self, event):
-        """Handle field selection from tree"""
+        """Handle field selection from treeview to highlight on canvas
+        
+        Args:
+            event: Selection event from treeview
+        """
         selection = self.fields_tree.selection()
         if selection:
             item = self.fields_tree.item(selection[0])
@@ -553,7 +925,7 @@ class ModernTemplateGUI:
                     # Remove previous highlights
                     self.canvas.delete("highlight")
 
-                    # Draw highlight (add image offset)
+                    # Draw highlight with current zoom and offset
                     x = int(rect["x"] * self.zoom_factor + self.image_offset_x)
                     y = int(rect["y"] * self.zoom_factor + self.image_offset_y)
                     w = int(rect["w"] * self.zoom_factor)
@@ -566,7 +938,11 @@ class ModernTemplateGUI:
                     break
 
     def show_context_menu(self, event):
-        """Show context menu for field operations"""
+        """Show context menu for field operations (edit/delete)
+        
+        Args:
+            event: Right-click event on treeview
+        """
         # Get the item under the cursor
         item_id = self.fields_tree.identify_row(event.y)
         if not item_id:
@@ -584,7 +960,7 @@ class ModernTemplateGUI:
         menu.post(event.x_root, event.y_root)
 
     def edit_field_name(self, event=None):
-        """Edit the selected field's name"""
+        """Edit the selected field's name with validation"""
         selection = self.fields_tree.selection()
         if not selection:
             return
@@ -653,7 +1029,7 @@ class ModernTemplateGUI:
         dialog.bind('<Escape>', lambda e: cancel())
 
     def delete_field(self):
-        """Delete the selected field"""
+        """Delete the selected field with confirmation dialog"""
         selection = self.fields_tree.selection()
         if not selection:
             return
@@ -668,7 +1044,7 @@ class ModernTemplateGUI:
         # Remove from rectangles list
         self.rectangles = [rect for rect in self.rectangles if rect["name"] != field_name]
 
-        # Update displays
+        # Update all displays and visualizations
         self.redraw_image()
         self.update_field_list()
         self.update_field_stats()
@@ -678,12 +1054,12 @@ class ModernTemplateGUI:
         self.update_status(f"🗑️ Field deleted: {field_name}", "#ef4444")
 
     def update_field_list(self):
-        """Update field list in tree view"""
+        """Update the field list in treeview with current data"""
         # Clear existing items
         for item in self.fields_tree.get_children():
             self.fields_tree.delete(item)
             
-        # Add fields
+        # Add fields with their coordinates
         for rect in self.rectangles:
             self.fields_tree.insert("", tk.END, values=(
                 rect["name"],
@@ -693,7 +1069,7 @@ class ModernTemplateGUI:
                 rect["h"]
             ))
             
-        # Update field count
+        # Update field count label
         count = len(self.rectangles)
         if count == 0:
             self.field_count_label.config(text="No fields selected")
@@ -703,7 +1079,13 @@ class ModernTemplateGUI:
             self.field_count_label.config(text=f"{count} fields selected")
 
     def update_field_stats(self):
-        """Update field statistics display"""
+        """Update comprehensive field statistics in the stats tab
+        
+        Calculates and displays:
+        - Total field count
+        - Coordinate bounds (X/Y ranges)
+        - Size statistics (average width/height, total area)
+        """
         self.stats_text.config(state=tk.NORMAL)
         self.stats_text.delete(1.0, tk.END)
         
@@ -737,7 +1119,17 @@ class ModernTemplateGUI:
 
 
     def open_image(self):
-        """Open and display an image with proper error handling and scaling"""
+        """Open and display an image with proper error handling and scaling
+        
+        This method handles:
+        - File selection through dialog
+        - Image loading and validation
+        - Canvas setup and zoom initialization
+        - Error handling with user-friendly messages
+        
+        Raises:
+            Various exceptions for file access, image format, or memory issues
+        """
         path = filedialog.askopenfilename(filetypes=[
             ("Image Files", "*.png;*.jpg;*.jpeg"),
             ("PNG files", "*.png"),
@@ -816,7 +1208,11 @@ class ModernTemplateGUI:
 
 
     def on_mouse_down(self, event):
-        """Handle mouse press for rectangle selection"""
+        """Handle mouse down event to start rectangle selection
+        
+        Args:
+            event: Mouse click event with coordinates
+        """
         if not self.image:
             messagebox.showwarning("⚠️ Warning", "Buka gambar terlebih dahulu!")
             return
@@ -840,7 +1236,11 @@ class ModernTemplateGUI:
         )
 
     def on_mouse_drag(self, event):
-        """Handle mouse drag for rectangle selection"""
+        """Handle mouse drag event to update rectangle selection
+        
+        Args:
+            event: Mouse drag event with current coordinates
+        """
         if self.current_rect:
             # Convert window coordinates to canvas coordinates
             canvas_x = self.canvas.canvasx(event.x)
@@ -854,7 +1254,11 @@ class ModernTemplateGUI:
             )
 
     def on_mouse_up(self, event):
-        """Handle mouse release for rectangle selection"""
+        """Handle mouse release event to finalize rectangle selection
+        
+        Args:
+            event: Mouse release event
+        """
         if self.current_rect:
             # Convert window coordinates to canvas coordinates
             canvas_x = self.canvas.canvasx(event.x)
@@ -893,6 +1297,7 @@ class ModernTemplateGUI:
                 self.update_status("❌ Rectangle too small, deleted", "#ef4444")
 
     def save_template(self):
+        """Save the current field selections as a JSON template file"""
         if not self.rectangles:
             messagebox.showwarning("⚠️ Warning", "No areas selected.")
             return
@@ -918,7 +1323,15 @@ class ModernTemplateGUI:
 
 
     def preview_extractions(self):
-        """Enhanced OCR extractions from selected areas with multiple preprocessing strategies"""
+        """Enhanced OCR extractions from selected areas with multiple preprocessing strategies
+        
+        This method provides:
+        - Real-time OCR processing on selected areas
+        - Multiple preprocessing strategies for better accuracy
+        - Confidence scoring for each extraction
+        - Performance metrics and statistics
+        - User-friendly formatted output
+        """
         if not self.image:
             messagebox.showwarning("⚠️ Warning", "Open an image first!")
             return
@@ -1248,6 +1661,29 @@ class ModernOCRGui:
             style='Secondary.TButton'
         ).pack(side=tk.RIGHT)
 
+        # Folder structure display for input images
+        tree_section = create_modern_frame(input_section, padding=5)
+        tree_section.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
+
+        create_modern_label(
+            tree_section,
+            "🗂️ Struktur Folder Input:",
+            style='Modern.TLabel'
+        ).pack(anchor="w")
+
+        tree_frame = tk.Frame(tree_section, bg='white')
+        tree_frame.pack(fill=tk.BOTH, expand=True, pady=(5, 0))
+
+        self.input_tree = ttk.Treeview(tree_frame, show='tree')
+        tree_v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=self.input_tree.yview)
+        self.input_tree.configure(yscrollcommand=tree_v_scroll.set)
+
+        self.input_tree.grid(row=0, column=0, sticky="nsew")
+        tree_v_scroll.grid(row=0, column=1, sticky="ns")
+
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
         # Output folder selection section
         output_section = create_modern_frame(self.ocr_frame, padding=20)
         output_section.pack(fill=tk.X, padx=20, pady=(0, 10))
@@ -1400,6 +1836,11 @@ class ModernOCRGui:
             if hasattr(self, 'log'):
                 self.log.insert(tk.END, f"📁 Folder input dipilih: {folder_path}\n")
                 self.log.see(tk.END)
+            # Populate folder structure view
+            try:
+                self.display_folder_structure(folder_path)
+            except Exception as e:
+                print(f"Gagal menampilkan struktur folder: {e}")
 
     def pick_output_folder(self):
         folder_path = filedialog.askdirectory(title="Pilih Folder Output Hasil OCR")
@@ -1409,6 +1850,61 @@ class ModernOCRGui:
             if hasattr(self, 'log'):
                 self.log.insert(tk.END, f"📁 Folder output dipilih: {folder_path}\n")
                 self.log.see(tk.END)
+
+    def clear_input_tree(self):
+        """Clear the input folder tree view"""
+        try:
+            for item in self.input_tree.get_children():
+                self.input_tree.delete(item)
+        except Exception:
+            pass
+
+    def display_folder_structure(self, folder_path):
+        """Walk the selected folder and populate the Treeview with directory structure"""
+        if not folder_path:
+            return
+
+        # Normalize and verify the selected folder path
+        base_path = os.path.normpath(os.path.abspath(folder_path))
+        if not os.path.isdir(base_path):
+            return
+
+        self.clear_input_tree()
+
+        # Insert root using last path component (fallback to full path)
+        root_name = os.path.basename(base_path) or base_path
+        root_id = self.input_tree.insert('', 'end', text=root_name, open=True)
+
+        nodes = {base_path: root_id}
+
+        for current_root, dirs, files in os.walk(base_path):
+            # Normalize current root for reliable comparisons
+            current_root_norm = os.path.normpath(os.path.abspath(current_root))
+
+            # Safety: skip anything not under the selected base path
+            if not current_root_norm.startswith(base_path):
+                continue
+
+            parent_id = nodes.get(current_root_norm, root_id)
+
+            # Sort for nicer display
+            dirs.sort()
+            files.sort()
+
+            for d in dirs:
+                full_d = os.path.normpath(os.path.join(current_root_norm, d))
+                try:
+                    nid = self.input_tree.insert(parent_id, 'end', text=d, open=False)
+                    nodes[full_d] = nid
+                except Exception:
+                    continue
+
+            for f in files:
+                try:
+                    # Only show file name (not full path)
+                    self.input_tree.insert(parent_id, 'end', text=f, open=False)
+                except Exception:
+                    continue
 
     def run_ocr(self):
         if not self.current_template_path:
