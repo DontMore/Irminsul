@@ -14,6 +14,7 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 import subprocess
+import threading
 import os
 from PIL import Image, ImageTk
 import json
@@ -1629,12 +1630,13 @@ class ModernOCRGui:
         )
         self.template_label.pack(side=tk.LEFT, padx=10)
 
-        create_modern_button(
+        self.template_btn = create_modern_button(
             template_row,
             "📁 Pilih Template",
             self.pick_template,
             style='Secondary.TButton'
-        ).pack(side=tk.RIGHT)
+        )
+        self.template_btn.pack(side=tk.RIGHT)
 
         # Input folder selection
         input_row = create_modern_frame(left_panel, padding=5)
@@ -1653,12 +1655,13 @@ class ModernOCRGui:
         )
         self.input_folder_label.pack(side=tk.LEFT, padx=10)
 
-        create_modern_button(
+        self.input_btn = create_modern_button(
             input_row,
             "📂 Pilih",
             self.pick_input_folder,
             style='Secondary.TButton'
-        ).pack(side=tk.RIGHT)
+        )
+        self.input_btn.pack(side=tk.RIGHT)
 
         # Output folder selection
         output_row = create_modern_frame(left_panel, padding=5)
@@ -1677,12 +1680,13 @@ class ModernOCRGui:
         )
         self.output_folder_label.pack(side=tk.LEFT, padx=10)
 
-        create_modern_button(
+        self.output_btn = create_modern_button(
             output_row,
             "📂 Pilih",
             self.pick_output_folder,
             style='Secondary.TButton'
-        ).pack(side=tk.RIGHT)
+        )
+        self.output_btn.pack(side=tk.RIGHT)
 
         # Export format
         export_row = create_modern_frame(left_panel, padding=5)
@@ -1702,12 +1706,20 @@ class ModernOCRGui:
         # Action buttons
         action_row = create_modern_frame(left_panel, padding=5)
         action_row.pack(fill=tk.X, pady=(10, 0))
-        create_modern_button(
+        self.start_btn = create_modern_button(
             action_row,
             "🚀 Mulai OCR",
             self.run_ocr,
             style='Accent.TButton'
-        ).pack(fill=tk.X)
+        )
+        self.start_btn.pack(fill=tk.X)
+
+        # Timer and loading indicator
+        self.ocr_timer_label = create_modern_label(left_panel, "Waktu: 00:00", style='Modern.TLabel')
+        self.ocr_timer_label.pack(pady=(8, 0))
+
+        self.ocr_loading_label = create_modern_label(left_panel, "", style='Modern.TLabel')
+        self.ocr_loading_label.pack()
 
         # Right panel: folder structure and logs
         right_panel = create_modern_frame(content_frame, padding=10)
@@ -1871,19 +1883,52 @@ class ModernOCRGui:
                 except Exception:
                     continue
 
-    def run_ocr(self):
-        if not self.current_template_path:
-            messagebox.showerror("❌ Error", "Template belum dipilih. Buat template di tab Template Creator atau pilih template existing.")
+    def _update_ocr_timer(self):
+        """Update the elapsed time label while OCR is running."""
+        if not getattr(self, '_ocr_running', False):
             return
+        elapsed = int(time.time() - getattr(self, '_ocr_start_time', time.time()))
+        mins, secs = divmod(elapsed, 60)
+        self.ocr_timer_label.config(text=f"Waktu: {mins:02d}:{secs:02d}")
+        self._ocr_timer_job = self.root.after(1000, self._update_ocr_timer)
 
+    def _animate_ocr_loading(self):
+        """Simple dots animation indicating OCR is running."""
+        if not getattr(self, '_ocr_running', False):
+            self.ocr_loading_label.config(text="")
+            return
+        self._loading_dots = (getattr(self, '_loading_dots', 0) + 1) % 4
+        dots = '.' * self._loading_dots
+        self.ocr_loading_label.config(text=f"Status: Running{dots}")
+        self._ocr_anim_job = self.root.after(500, self._animate_ocr_loading)
+
+    def _stop_ocr_ui(self):
+        """Stop timer/animation and re-enable controls."""
+        self._ocr_running = False
         try:
-            # Get the directory of the template file
+            if hasattr(self, '_ocr_timer_job'):
+                self.root.after_cancel(self._ocr_timer_job)
+        except Exception:
+            pass
+        try:
+            if hasattr(self, '_ocr_anim_job'):
+                self.root.after_cancel(self._ocr_anim_job)
+        except Exception:
+            pass
+        # Re-enable controls
+        try:
+            self.template_btn.config(state=tk.NORMAL)
+            self.input_btn.config(state=tk.NORMAL)
+            self.output_btn.config(state=tk.NORMAL)
+            self.start_btn.config(state=tk.NORMAL)
+        except Exception:
+            pass
+
+    def _ocr_worker(self):
+        """Background worker that runs the OCR subprocess and posts results back to the GUI thread."""
+        try:
             template_dir = os.path.dirname(self.current_template_path)
-
-            # Ensure output folder exists
             os.makedirs(self.image_folder, exist_ok=True)
-
-            # Get selected export format
             export_format = self.export_format_var.get()
 
             cmd = [
@@ -1894,52 +1939,70 @@ class ModernOCRGui:
                 "/data/" + os.path.relpath(self.image_folder, template_dir)
             ]
 
-            if hasattr(self, 'log'):
-                self.log.insert(tk.END, "🚀 Menjalankan OCR di Docker...\n")
-                self.log.insert(tk.END, f"📁 Template: {os.path.basename(self.current_template_path)}\n")
-                self.log.insert(tk.END, f"📁 Output folder: {self.image_folder}\n")
-                self.log.insert(tk.END, f"📊 Export format: {export_format}\n")
-                self.log.see(tk.END)
+            def append_log(s):
+                self.root.after(0, lambda: (self.log.insert(tk.END, s), self.log.see(tk.END)))
 
-            self.root.update()
+            append_log("🚀 Menjalankan OCR di Docker...\n")
+            append_log(f"📁 Template: {os.path.basename(self.current_template_path)}\n")
+            append_log(f"📁 Output folder: {self.image_folder}\n")
+            append_log(f"📊 Export format: {export_format}\n")
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode == 0:
-                # Handle export format conversion
                 csv_path = os.path.join(template_dir, "hasil_ocr.csv")
-
                 if export_format == "Excel" and os.path.exists(csv_path):
                     try:
-                        # Convert CSV to Excel
                         df = pd.read_csv(csv_path)
                         excel_path = os.path.join(template_dir, "hasil_ocr.xlsx")
                         df.to_excel(excel_path, index=False)
-
-                        if hasattr(self, 'log'):
-                            self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.xlsx\n")
-                            self.log.see(tk.END)
-                        messagebox.showinfo("✅ Selesai", f"OCR selesai! Hasil tersimpan sebagai Excel: hasil_ocr.xlsx")
+                        append_log("✅ Selesai! Hasil OCR tersimpan di hasil_ocr.xlsx\n")
+                        self.root.after(0, lambda: messagebox.showinfo("✅ Selesai", f"OCR selesai! Hasil tersimpan sebagai Excel: hasil_ocr.xlsx"))
                     except Exception as convert_error:
-                        if hasattr(self, 'log'):
-                            self.log.insert(tk.END, f"⚠️ CSV tersimpan, tapi konversi Excel gagal: {str(convert_error)}\n")
-                            self.log.see(tk.END)
-                        messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV (konversi Excel gagal).")
+                        append_log(f"⚠️ CSV tersimpan, tapi konversi Excel gagal: {str(convert_error)}\n")
+                        self.root.after(0, lambda: messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV (konversi Excel gagal)."))
                 else:
-                    if hasattr(self, 'log'):
-                        self.log.insert(tk.END, "✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
-                        self.log.see(tk.END)
-                    messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV.")
+                    append_log("✅ Selesai! Hasil OCR tersimpan di hasil_ocr.csv\n")
+                    self.root.after(0, lambda: messagebox.showinfo("✅ Selesai", "OCR selesai! Hasil tersimpan sebagai CSV."))
             else:
-                if hasattr(self, 'log'):
-                    self.log.insert(tk.END, f"❌ Error: {result.stderr}\n")
-                    self.log.see(tk.END)
-                messagebox.showerror("❌ Error", f"OCR gagal: {result.stderr}")
+                append_log(f"❌ Error: {result.stderr}\n")
+                self.root.after(0, lambda: messagebox.showerror("❌ Error", f"OCR gagal: {result.stderr}"))
 
         except FileNotFoundError:
-            messagebox.showerror("❌ Error", "Docker tidak ditemukan. Pastikan Docker sudah terinstall dan running.")
+            self.root.after(0, lambda: messagebox.showerror("❌ Error", "Docker tidak ditemukan. Pastikan Docker sudah terinstall dan running."))
         except Exception as e:
-            messagebox.showerror("❌ Error", f"Terjadi kesalahan: {str(e)}")
+            self.root.after(0, lambda: messagebox.showerror("❌ Error", f"Terjadi kesalahan: {str(e)}"))
+        finally:
+            # Stop UI indicators
+            self.root.after(0, self._stop_ocr_ui)
+
+    def run_ocr(self):
+        # Run OCR in a background thread and show elapsed time + loading animation
+        if not self.current_template_path:
+            messagebox.showerror("❌ Error", "Template belum dipilih. Buat template di tab Template Creator atau pilih template existing.")
+            return
+
+        # Disable controls
+        try:
+            self.template_btn.config(state=tk.DISABLED)
+            self.input_btn.config(state=tk.DISABLED)
+            self.output_btn.config(state=tk.DISABLED)
+            self.start_btn.config(state=tk.DISABLED)
+        except Exception:
+            pass
+
+        # Initialize timer/animation state
+        self._ocr_running = True
+        self._ocr_start_time = time.time()
+        self._loading_dots = 0
+
+        # Start UI timers
+        self._update_ocr_timer()
+        self._animate_ocr_loading()
+
+        # Start worker thread
+        thread = threading.Thread(target=self._ocr_worker, daemon=True)
+        thread.start()
 
 if __name__ == "__main__":
     root = tk.Tk()
