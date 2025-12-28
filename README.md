@@ -4,39 +4,39 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](dockerfile)
 
-**Irminsul** adalah aplikasi OCR (Optical Character Recognition) modern dengan antarmuka yang user-friendly untuk ekstraksi teks dari gambar menggunakan template yang dapat disesuaikan. Aplikasi ini mendukung batch processing dan dapat dijalankan dalam container Docker untuk konsistensi lingkungan.
+**Irminsul** is a modern OCR (Optical Character Recognition) application with a user-friendly interface for text extraction from images using customizable templates. The application supports batch processing and can run in Docker containers for environment consistency.
 
-## 🎯 Fitur Utama
+## 🎯 Key Features
 
 ### 🔍 OCR Engine
-- **Tesseract Integration**: Ekstraksi teks menggunakan Tesseract OCR engine
-- **Multi-language Support**: Mendukung bahasa Inggris dan Indonesia (`eng+ind`)
-- **Template-based**: Menggunakan template JSON untuk area ekstraksi yang presisi
-- **Batch Processing**: Memproses multiple gambar sekaligus
+- **Tesseract Integration**: Text extraction using Tesseract OCR engine
+- **Multi-language Support**: Supports English and Indonesian languages (`eng+ind`)
+- **Template-based**: Uses JSON templates for precise extraction areas
+- **Batch Processing**: Processes multiple images simultaneously
 
 ### 📐 Template Creator
-- **Visual Template Designer**: Buat template dengan drag & drop interface
-- **Real-time Preview**: Preview ekstraksi teks secara real-time
-- **Field Management**: Kelola multiple field extraction dengan mudah
-- **JSON Export**: Eksport template ke format JSON untuk reusability
+- **Visual Template Designer**: Create templates with drag & drop interface
+- **Real-time Preview**: Real-time text extraction preview
+- **Field Management**: Manage multiple field extraction easily
+- **JSON Export**: Export templates to JSON format for reusability
 
 ### 📸 Screenshot Tools
-- **Interactive Screenshot**: Screenshot dengan overlay untuk selection
-- **Custom Output Directory**: Pilih folder output sesuai kebutuhan
+- **Interactive Screenshot**: Screenshot with overlay for selection
+- **Custom Output Directory**: Choose output folder according to needs
 - **Multiple Format Support**: PNG, JPG, JPEG support
 
 ### 🎨 Modern GUI
-- **Tkinter-based Interface**: Interface modern dengan tkinter
-- **Responsive Design**: Layout yang responsif dan user-friendly
-- **Tabbed Interface**: Organisir workflow dengan tab interface
-- **Real-time Logging**: Log aktivitas dan progress secara real-time
+- **Tkinter-based Interface**: Modern interface with tkinter
+- **Responsive Design**: Responsive and user-friendly layout
+- **Tabbed Interface**: Organize workflow with tab interface
+- **Real-time Logging**: Real-time activity and progress logging
 
 ### 🐳 Docker Support
-- **Containerized OCR**: Jalankan OCR dalam environment yang konsisten
-- **Volume Mounting**: Mount directory untuk input/output files
-- **Cross-platform**: Berjalan di Windows, macOS, dan Linux
+- **Containerized OCR**: Run OCR in consistent environment
+- **Volume Mounting**: Mount directory for input/output files
+- **Cross-platform**: Runs on Windows, macOS, and Linux
 
-## 📋 Persyaratan Sistem
+## 📋 System Requirements
 
 ### Python Dependencies
 ```
@@ -48,9 +48,9 @@ tkinter
 ```
 
 ### System Dependencies
-- **Python**: 3.8 atau lebih baru
-- **Tesseract OCR**: Harus terinstall di sistem
-- **Docker**: (Opsional) untuk containerized version
+- **Python**: 3.8 or newer
+- **Tesseract OCR**: Must be installed on system
+- **Docker**: (Optional) for containerized version
 
 ### Install Tesseract
 
@@ -66,11 +66,11 @@ brew install tesseract
 ```
 
 #### Windows
-1. Download Tesseract dari [GitHub releases](https://github.com/UB-Mannheim/tesseract/wiki)
-2. Install dan tambahkan ke PATH
+1. Download Tesseract from [GitHub releases](https://github.com/UB-Mannheim/tesseract/wiki)
+2. Install and add to PATH
 3. Install language packs (eng, ind)
 
-## 🚀 Instalasi & Setup
+## 🚀 Installation & Setup
 
 ### 1. Clone Repository
 ```bash
@@ -82,7 +82,7 @@ cd Irminsul
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
-# atau
+# or
 venv\Scripts\activate  # Windows
 ```
 
@@ -92,19 +92,19 @@ pip install -r requirements.txt
 ```
 
 ### 4. Setup Tesseract
-Pastikan Tesseract terinstall dan dapat diakses dari command line:
+Make sure Tesseract is installed and accessible from command line:
 ```bash
 tesseract --version
 ```
 
-### 5. Build Docker Image (Opsional)
+### 5. Build Docker Image (Optional)
 ```bash
 docker build -t ocr-app .
 ```
 
-## 📖 Penggunaan
+## 📖 Usage
 
-### Menjalankan GUI
+### Running GUI
 ```bash
 python gui_modern.py
 ```
@@ -114,27 +114,27 @@ python gui_modern.py
 python extract.py template.json /path/to/image/folder
 ```
 
-### Mode Operasional
+### Operational Modes
 
 #### 1. Screenshot Mode
-1. Buka tab "📸 Screenshot"
-2. Pilih output folder
-3. Klik "🎯 Take Screenshot"
-4. Select area untuk screenshot
+1. Open "📸 Screenshot" tab
+2. Select output folder
+3. Click "🎯 Take Screenshot"
+4. Select area for screenshot
 
 #### 2. Template Creator Mode
-1. Buka tab "📐 Template Creator"
-2. Klik "📁 Open Image"
-3. Drag untuk select area ekstraksi
-4. Klik "💾 Save Template" untuk menyimpan
+1. Open "📐 Template Creator" tab
+2. Click "📁 Open Image"
+3. Drag to select extraction area
+4. Click "💾 Save Template" to save
 
 #### 3. OCR Process Mode
-1. Buka tab "🔍 OCR Process"
-2. Pilih template JSON
-3. Klik "🚀 Mulai OCR"
-4. Lihat hasil di `hasil_ocr.csv`
+1. Open "🔍 OCR Process" tab
+2. Select JSON template
+3. Click "🚀 Start OCR"
+4. View results in `hasil_ocr.csv`
 
-## 📁 Struktur Project
+## 📁 Project Structure
 
 ```
 Irminsul/
@@ -144,14 +144,14 @@ Irminsul/
 ├── template.py            # Template management
 ├── modern_styles.py       # GUI styling
 ├── dockerfile            # Docker container definition
-├── requirements.txt      # Python dependencies
-├── template.json         # Template example
+├── requirements.txt      # template.json         # Python dependencies
+├── Template example
 └── README.md            # Documentation
 ```
 
-## 🎛️ Konfigurasi Template
+## 🎛️ Template Configuration
 
-Template menggunakan format JSON dengan struktur berikut:
+Templates use JSON format with the following structure:
 
 ```json
 {
@@ -167,10 +167,10 @@ Template menggunakan format JSON dengan struktur berikut:
 }
 ```
 
-### Parameter Field
-- **name**: Identifier unik untuk field
-- **x, y**: Koordinat pixel左上角
-- **w, h**: Lebar dan tinggi area ekstraksi (pixels)
+### Field Parameters
+- **name**: Unique identifier for field
+- **x, y**: Pixel coordinates of top-left corner
+- **w, h**: Width and height of extraction area (pixels)
 
 ## 🐳 Docker Usage
 
@@ -179,7 +179,7 @@ Template menggunakan format JSON dengan struktur berikut:
 docker build -t ocr-app .
 ```
 
-### Run OCR dengan Docker
+### Run OCR with Docker
 ```bash
 docker run --rm \
   -v /path/to/data:/data \
@@ -200,11 +200,11 @@ docker run --rm -it \
 
 ## 📊 Output Format
 
-OCR menghasilkan file CSV dengan kolom:
-- **filename**: Nama file gambar
-- **field_name**: Nilai ekstraksi untuk setiap field
+OCR generates CSV file with columns:
+- **filename**: Image file name
+- **field_name**: Extraction value for each field
 
-Contoh output CSV:
+Example CSV output:
 ```csv
 filename,field_1,field_2,field_3
 image1.png,Text Content,123.45,Data
@@ -259,38 +259,38 @@ export DISPLAY=:0
 sudo apt-get install xfce4-terminal
 ```
 
-#### 4. Memory Issues dengan Large Images
-- Reduce image size sebelum processing
+#### 4. Memory Issues with Large Images
+- Reduce image size before processing
 - Increase system memory/virtual memory
 - Process images in smaller batches
 
 ### Debug Mode
-Tambahkan logging untuk debugging:
+Add logging for debugging:
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-## 🤝 Kontribusi
+## 🤝 Contributing
 
 1. Fork repository
-2. Buat feature branch (`git checkout -b feature/amazing-feature`)
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit changes (`git commit -m 'Add amazing feature'`)
 4. Push to branch (`git push origin feature/amazing-feature`)
-5. Buka Pull Request
+5. Open Pull Request
 
 ## 📝 Development Notes
 
 ### Modern GUI Features
 - **Tabbed Interface**: Screenshot, Template Creator, OCR Process
 - **Real-time Preview**: Live OCR preview
-- **Zoom Controls**: Zoom in/out untuk detailed selection
-- **Mini-map**: Overview of image dengan field highlights
+- **Zoom Controls**: Zoom in/out for detailed selection
+- **Mini-map**: Overview of image with field highlights
 - **Field Statistics**: Real-time field analysis
 
 ### Performance Optimizations
 - **Lazy Loading**: Load images only when needed
-- **Efficient OCR**: Batch processing untuk multiple images
+- **Efficient OCR**: Batch processing for multiple images
 - **Memory Management**: Proper cleanup of image resources
 - **Responsive UI**: Non-blocking operations
 
@@ -308,10 +308,10 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 📞 Support
 
-Untuk support dan вопросы:
-1. Buka [Issues](../../issues) untuk bug reports
-2. Baca [Troubleshooting](#-troubleshooting) section
-3. Check [Documentation](#-penggunaan) untuk usage examples
+For support and questions:
+1. Open [Issues](../../issues) for bug reports
+2. Read [Troubleshooting](#-troubleshooting) section
+3. Check [Documentation](#-usage) for usage examples
 
 ---
 
