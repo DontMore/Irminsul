@@ -24,6 +24,7 @@ import time
 import numpy as np
 import pandas as pd
 from screenshot import ScreenshotMiniGUI
+import shutil
 from modern_styles import apply_modern_styling, create_modern_frame, create_modern_button, create_modern_label, create_modern_notebook
 from enhanced_ocr import EnhancedOCR, enhanced_ocr_extract
 
@@ -87,6 +88,13 @@ class ModernTemplateGUI:
             style='Modern.TButton'
         ).pack(side=tk.LEFT, padx=(0, 10))
 
+        create_modern_button(
+            left_controls,
+            "📂 Open Template",
+            lambda: self.pick_template_in_creator(),
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
         # Center controls: Zoom controls
         center_controls = create_modern_frame(control_panel, padding=0)
         center_controls.pack(side=tk.LEFT, expand=True)
@@ -137,6 +145,13 @@ class ModernTemplateGUI:
             right_controls, 
             "👁️ Preview", 
             self.preview_extractions, 
+            style='Secondary.TButton'
+        ).pack(side=tk.LEFT, padx=(0, 10))
+
+        create_modern_button(
+            right_controls,
+            "📂 Open Template",
+            lambda: self.open_template_file(),
             style='Secondary.TButton'
         ).pack(side=tk.LEFT, padx=(0, 10))
 
@@ -1314,14 +1329,114 @@ class ModernTemplateGUI:
             with open(save_path, "w") as f:
                 json.dump({"fields": self.rectangles}, f, indent=4)
 
-            messagebox.showinfo("✅ Success", f"Template saved to: {save_path}")
-            # Notify parent about new template
+            # Copy into central templates folder if available
+            templates_dir = getattr(self.parent_frame, 'templates_dir', None)
+            final_path = save_path
+            if templates_dir:
+                try:
+                    os.makedirs(templates_dir, exist_ok=True)
+                    dest = os.path.join(templates_dir, os.path.basename(save_path))
+                    # If saving to different location, copy; handle existing file
+                    if os.path.abspath(save_path) != os.path.abspath(dest):
+                        if os.path.exists(dest):
+                            overwrite = messagebox.askyesno("Overwrite?", f"Template {os.path.basename(dest)} already exists in Template/. Overwrite?")
+                            if not overwrite:
+                                base, ext = os.path.splitext(os.path.basename(save_path))
+                                dest = os.path.join(templates_dir, f"{base}_{int(time.time())}{ext}")
+                        shutil.copy(save_path, dest)
+                        final_path = dest
+                except Exception as e:
+                    print(f"Warning: could not copy template to Template/: {e}")
+
+            messagebox.showinfo("✅ Success", f"Template saved to: {final_path}")
+            # Notify parent about new template (use final_path under Template/ when possible)
             if hasattr(self.parent_frame, 'on_template_created'):
-                self.parent_frame.on_template_created(save_path)
+                try:
+                    self.parent_frame.on_template_created(final_path)
+                except Exception:
+                    pass
+            # Refresh template list in parent if available
+            if hasattr(self.parent_frame, 'refresh_templates'):
+                try:
+                    self.parent_frame.refresh_templates()
+                except Exception:
+                    pass
         except Exception as e:
             messagebox.showerror("❌ Error", f"Failed to save template: {str(e)}")
 
+    def load_template(self, path):
+        """Load template JSON from `path` and display fields on canvas."""
+        try:
+            with open(path, "r") as f:
+                data = json.load(f)
 
+            fields = data.get("fields", [])
+            if not isinstance(fields, list):
+                raise ValueError("Invalid template format: 'fields' should be a list")
+
+            # Replace current rectangles and redraw
+            self.rectangles = fields
+            # Clear canvas and re-display image if present
+            try:
+                self.canvas.delete("all")
+            except Exception:
+                pass
+            if hasattr(self, 'tk_image') and self.tk_image:
+                try:
+                    canvas_width = self.canvas.winfo_width() or self.viewport_frame.winfo_width() or 800
+                    canvas_height = self.canvas.winfo_height() or self.viewport_frame.winfo_height() or 600
+                    x = max(0, (canvas_width - self.image.width) // 2)
+                    y = max(0, (canvas_height - self.image.height) // 2)
+                    self.canvas.create_image(x, y, anchor="nw", image=self.tk_image, tags="main_image")
+                    self.zoom_factor = getattr(self, 'zoom_factor', 1.0)
+                    self.image_offset_x = getattr(self, 'image_offset_x', x)
+                    self.image_offset_y = getattr(self, 'image_offset_y', y)
+                except Exception:
+                    pass
+
+            # Use existing redraw function
+            try:
+                self.redraw_rectangles()
+            except Exception:
+                # Fallback: draw simple rectangles
+                try:
+                    for rect in self.rectangles:
+                        x, y, w, h = rect.get('x', 0), rect.get('y', 0), rect.get('w', 0), rect.get('h', 0)
+                        self.canvas.create_rectangle(x, y, x + w, y + h, outline="#2563eb", width=2, tags='field_rect')
+                except Exception:
+                    pass
+
+            try:
+                if hasattr(self, 'update_field_list'):
+                    self.update_field_list()
+            except Exception:
+                pass
+            try:
+                if hasattr(self, 'update_minimap'):
+                    self.update_minimap()
+            except Exception:
+                pass
+
+            return True
+        except Exception as e:
+            messagebox.showerror("❌ Error", f"Gagal memuat template: {e}")
+            return False
+
+    def open_template_file(self):
+        """Open a template file (from Template/ by default) and load into this Template Creator."""
+        initial = getattr(self.parent_frame, 'templates_dir', 'Template')
+        path = filedialog.askopenfilename(title="Open Template JSON", initialdir=initial, filetypes=[("JSON", "*.json")])
+        if not path:
+            return
+        ok = self.load_template(path)
+        if ok:
+            # Notify parent if possible
+            try:
+                if hasattr(self.parent_frame, 'on_template_created'):
+                    self.parent_frame.on_template_created(path)
+            except Exception:
+                pass
+            self.update_status(f"📂 Template dimuat: {os.path.basename(path)}", "#10b981")
 
     def preview_extractions(self):
         """Enhanced OCR extractions from selected areas with multiple preprocessing strategies
@@ -1451,7 +1566,11 @@ class ModernOCRGui:
         self.template = ""
         self.image_folder = "screenshots"
         self.current_template_path = ""
+        self.templates_dir = "Template"
+        os.makedirs(self.templates_dir, exist_ok=True)
+        self.template_map = {}
         self.input_folder_path = ""
+        self.input_file_path = ""
         self.output_folder_path = ""
         self.export_format_var = None  # Will be initialized in setup_ocr_tab
 
@@ -1630,6 +1749,19 @@ class ModernOCRGui:
         )
         self.template_label.pack(side=tk.LEFT, padx=10)
 
+        # Templates combobox and controls
+        self.templates_combobox = ttk.Combobox(template_row, state='readonly', width=30)
+        self.templates_combobox.pack(side=tk.RIGHT, padx=(0,10))
+        self.templates_combobox.bind('<<ComboboxSelected>>', self.on_template_select)
+
+        refresh_btn = create_modern_button(
+            template_row,
+            "🔄 Refresh",
+            lambda: self.refresh_templates(),
+            style='Secondary.TButton'
+        )
+        refresh_btn.pack(side=tk.RIGHT, padx=(0,10))
+
         self.template_btn = create_modern_button(
             template_row,
             "📁 Pilih Template",
@@ -1637,6 +1769,30 @@ class ModernOCRGui:
             style='Secondary.TButton'
         )
         self.template_btn.pack(side=tk.RIGHT)
+
+        open_creator_btn = create_modern_button(
+            template_row,
+            "✏️ Buka di Template Creator",
+            lambda: self.open_template_in_creator(),
+            style='Secondary.TButton'
+        )
+        open_creator_btn.pack(side=tk.RIGHT, padx=(0,10))
+
+        # Populate templates list
+        try:
+            self.refresh_templates()
+        except Exception:
+            pass
+
+        # Input mode selection (folder or single file)
+        mode_row = create_modern_frame(left_panel, padding=5)
+        mode_row.pack(fill=tk.X, pady=(6, 6))
+        create_modern_label(mode_row, "Mode Input:", style='Modern.TLabel').pack(side=tk.LEFT)
+        self.input_mode_var = tk.StringVar(value="folder")  # "folder" or "file"
+        rb1 = tk.Radiobutton(mode_row, text="Folder (Batch)", variable=self.input_mode_var, value="folder", indicatoron=0, width=12)
+        rb2 = tk.Radiobutton(mode_row, text="Single File", variable=self.input_mode_var, value="file", indicatoron=0, width=12)
+        rb1.pack(side=tk.LEFT, padx=6)
+        rb2.pack(side=tk.LEFT, padx=6)
 
         # Input folder selection
         input_row = create_modern_frame(left_panel, padding=5)
@@ -1662,6 +1818,31 @@ class ModernOCRGui:
             style='Secondary.TButton'
         )
         self.input_btn.pack(side=tk.RIGHT)
+
+        # Single file selection (visible always, used when mode=file)
+        file_row = create_modern_frame(left_panel, padding=5)
+        file_row.pack(fill=tk.X, pady=(0, 8))
+
+        create_modern_label(
+            file_row,
+            "📄 File Input:",
+            style='Modern.TLabel'
+        ).pack(side=tk.LEFT)
+
+        self.input_file_label = create_modern_label(
+            file_row,
+            "Belum dipilih",
+            style='Modern.TLabel'
+        )
+        self.input_file_label.pack(side=tk.LEFT, padx=10)
+
+        self.input_file_btn = create_modern_button(
+            file_row,
+            "📄 Pilih File",
+            self.pick_input_file,
+            style='Secondary.TButton'
+        )
+        self.input_file_btn.pack(side=tk.RIGHT)
 
         # Output folder selection
         output_row = create_modern_frame(left_panel, padding=5)
@@ -1779,6 +1960,11 @@ class ModernOCRGui:
             if hasattr(self, 'log'):
                 self.log.insert(tk.END, f"✅ Screenshot baru: {os.path.basename(path)}\n")
                 self.log.see(tk.END)
+            # Show popup notification to user
+            try:
+                messagebox.showinfo("✅ Screenshot Tersimpan", f"Screenshot berhasil disimpan:\n{path}")
+            except Exception:
+                pass
                 
         except Exception as e:
             error_msg = f"Gagal memproses screenshot: {str(e)}"
@@ -1805,6 +1991,83 @@ class ModernOCRGui:
                 self.log.insert(tk.END, f"📁 Template dipilih: {self.template}\n")
                 self.log.see(tk.END)
 
+    def pick_template_in_creator(self):
+        """Open a template file from disk (default to `Template/`) and load into Template Creator."""
+        initial = getattr(self, 'templates_dir', os.getcwd())
+        path = filedialog.askopenfilename(initialdir=initial, title="Open Template JSON", filetypes=[("JSON", "*.json")])
+        if not path:
+            return
+        try:
+            ok = self.template_gui.load_template(path)
+            if ok:
+                self.notebook.select(self.template_frame)
+                self.current_template_path = path
+                self.template_label.config(text=os.path.basename(path), foreground="#10b981")
+                if hasattr(self, 'log'):
+                    self.log.insert(tk.END, f"📂 Template dibuka di Template Creator: {path}\n")
+                    self.log.see(tk.END)
+        except Exception as e:
+            messagebox.showerror("❌ Error", f"Gagal membuka template: {e}")
+
+    def list_templates(self):
+        """Scan `self.templates_dir` and return list of template file paths."""
+        results = []
+        try:
+            for fname in os.listdir(self.templates_dir):
+                if fname.lower().endswith('.json'):
+                    results.append(os.path.join(self.templates_dir, fname))
+        except Exception:
+            pass
+        return sorted(results)
+
+    def refresh_templates(self):
+        """Refresh combobox with available templates from `Template/` folder."""
+        templates = self.list_templates()
+        display = [os.path.basename(p) for p in templates]
+        self.template_map = {os.path.basename(p): p for p in templates}
+        # Update combobox values
+        self.templates_combobox['values'] = display
+        if display:
+            # select first by default
+            try:
+                self.templates_combobox.current(0)
+            except Exception:
+                pass
+            self.on_template_select()
+        else:
+            self.templates_combobox.set('')
+
+    def on_template_select(self, event=None):
+        name = self.templates_combobox.get()
+        if not name:
+            return
+        path = self.template_map.get(name)
+        if path:
+            self.current_template_path = path
+            self.template_label.config(text=name, foreground="#10b981")
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"📁 Template dipilih: {path}\n")
+                self.log.see(tk.END)
+
+    def open_template_in_creator(self):
+        """Open the currently selected template in the Template Creator tab."""
+        if not self.current_template_path:
+            messagebox.showwarning("⚠️ Warning", "Pilih template terlebih dahulu dari daftar atau gunakan 'Pilih Template'.")
+            return
+
+        try:
+            if hasattr(self, 'template_gui') and self.template_gui:
+                ok = self.template_gui.load_template(self.current_template_path)
+                if ok:
+                    self.notebook.select(self.template_frame)
+                    if hasattr(self, 'log'):
+                        self.log.insert(tk.END, f"✏️ Membuka template di Template Creator: {self.current_template_path}\n")
+                        self.log.see(tk.END)
+            else:
+                messagebox.showinfo("Info", "Template Creator tidak tersedia saat ini.")
+        except Exception as e:
+            messagebox.showerror("❌ Error", f"Gagal membuka template di Template Creator: {e}")
+
     def pick_input_folder(self):
         folder_path = filedialog.askdirectory(title="Pilih Folder Input Gambar")
         if folder_path:
@@ -1818,6 +2081,20 @@ class ModernOCRGui:
                 self.display_folder_structure(folder_path)
             except Exception as e:
                 print(f"Gagal menampilkan struktur folder: {e}")
+
+    def pick_input_file(self):
+        """Pilih satu file gambar untuk mode single-file"""
+        file_path = filedialog.askopenfilename(title="Pilih File Input Gambar", filetypes=[
+            ("Image Files", "*.png;*.jpg;*.jpeg"),
+            ("PNG files", "*.png"),
+            ("JPEG files", "*.jpg;*.jpeg")
+        ])
+        if file_path:
+            self.input_file_path = file_path
+            self.input_file_label.config(text=os.path.basename(file_path), foreground="#10b981")
+            if hasattr(self, 'log'):
+                self.log.insert(tk.END, f"📄 File input dipilih: {file_path}\n")
+                self.log.see(tk.END)
 
     def pick_output_folder(self):
         folder_path = filedialog.askdirectory(title="Pilih Folder Output Hasil OCR")
@@ -1919,6 +2196,10 @@ class ModernOCRGui:
         try:
             self.template_btn.config(state=tk.NORMAL)
             self.input_btn.config(state=tk.NORMAL)
+            try:
+                self.input_file_btn.config(state=tk.NORMAL)
+            except Exception:
+                pass
             self.output_btn.config(state=tk.NORMAL)
             self.start_btn.config(state=tk.NORMAL)
         except Exception:
@@ -1931,13 +2212,7 @@ class ModernOCRGui:
             os.makedirs(self.image_folder, exist_ok=True)
             export_format = self.export_format_var.get()
 
-            cmd = [
-                "docker", "run", "--rm",
-                "-v", f"{template_dir}:/data",
-                "ocr-app",
-                "/data/" + os.path.basename(self.current_template_path),
-                "/data/" + os.path.relpath(self.image_folder, template_dir)
-            ]
+            mode = getattr(self, 'input_mode_var', tk.StringVar(value="folder")).get()
 
             def append_log(s):
                 self.root.after(0, lambda: (self.log.insert(tk.END, s), self.log.see(tk.END)))
@@ -1946,6 +2221,31 @@ class ModernOCRGui:
             append_log(f"📁 Template: {os.path.basename(self.current_template_path)}\n")
             append_log(f"📁 Output folder: {self.image_folder}\n")
             append_log(f"📊 Export format: {export_format}\n")
+
+            if mode == "folder":
+                input_path = self.input_folder_path
+                append_log(f"📁 Input mode: Folder (batch) -> {input_path}\n")
+                cmd = [
+                    "docker", "run", "--rm",
+                    "-v", f"{template_dir}:/data",
+                    "-v", f"{input_path}:/input",
+                    "ocr-app",
+                    "/data/" + os.path.basename(self.current_template_path),
+                    "/input"
+                ]
+            else:
+                file_path = self.input_file_path
+                file_dir = os.path.dirname(file_path)
+                append_log(f"📁 Input mode: Single File -> {file_path}\n")
+                cmd = [
+                    "docker", "run", "--rm",
+                    "-v", f"{template_dir}:/data",
+                    "-v", f"{file_dir}:/input",
+                    "ocr-app",
+                    "/data/" + os.path.basename(self.current_template_path),
+                    "/input/" + os.path.basename(file_path)
+                ]
+            append_log("🔗 Command: " + " ".join(cmd) + "\n")
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -1982,10 +2282,25 @@ class ModernOCRGui:
             messagebox.showerror("❌ Error", "Template belum dipilih. Buat template di tab Template Creator atau pilih template existing.")
             return
 
+        # Validate input according to selected mode
+        mode = getattr(self, 'input_mode_var', tk.StringVar(value="folder")).get()
+        if mode == "folder":
+            if not self.input_folder_path:
+                messagebox.showerror("❌ Error", "Folder input belum dipilih untuk mode batch.")
+                return
+        else:
+            if not getattr(self, 'input_file_path', ""):
+                messagebox.showerror("❌ Error", "File input belum dipilih untuk mode single-file.")
+                return
+
         # Disable controls
         try:
             self.template_btn.config(state=tk.DISABLED)
             self.input_btn.config(state=tk.DISABLED)
+            try:
+                self.input_file_btn.config(state=tk.DISABLED)
+            except Exception:
+                pass
             self.output_btn.config(state=tk.DISABLED)
             self.start_btn.config(state=tk.DISABLED)
         except Exception:
