@@ -1,6 +1,6 @@
 opencv-python-headless
 pandas
 numpy
-Pillow
+Pillow>=9.2.0
 pyautogui
 pytesseract

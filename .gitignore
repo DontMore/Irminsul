@@ -1,3 +1,7 @@
 /screenshots
 venv/
 __pycache__/
+/Output
+/Template
+/venv_irminsul
+/test_screenshots

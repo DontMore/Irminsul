@@ -91,7 +91,7 @@ class ModernTemplateGUI:
         create_modern_button(
             left_controls,
             "📂 Open Template",
-            lambda: self.pick_template_in_creator(),
+            self.open_template_file,
             style='Secondary.TButton'
         ).pack(side=tk.LEFT, padx=(0, 10))
 
@@ -411,9 +411,6 @@ class ModernTemplateGUI:
 
         # Initialize stats display
         self.update_field_stats()
-
-
-    def setup_ui(self):
         # Main container with modern padding
         main_container = create_modern_frame(self.parent_frame, padding=15)
         main_container.pack(fill=tk.BOTH, expand=True)
