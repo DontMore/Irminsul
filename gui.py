@@ -1943,7 +1943,7 @@ class ModernOCRGui:
 
     def open_screenshot(self):
         win = tk.Toplevel(self.root)
-        ScreenshotMiniGUI(win, callback=self.after_screenshot, save_dir=self.image_folder)
+        ScreenshotMiniGUI(win, callback=self.after_screenshot, save_dir=self.image_folder, hotkey="F9")
 
     def after_screenshot(self, path):
         """Handle screenshot completion with custom folder path"""
@@ -1962,7 +1962,8 @@ class ModernOCRGui:
                 self.log.see(tk.END)
             # Show popup notification to user
             try:
-                messagebox.showinfo("✅ Screenshot Tersimpan", f"Screenshot berhasil disimpan:\n{path}")
+                # messagebox.showinfo("✅ Screenshot Tersimpan", f"Screenshot berhasil disimpan:\n{path}")
+                pass
             except Exception:
                 pass
                 
