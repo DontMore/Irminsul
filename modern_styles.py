@@ -122,8 +122,8 @@ class ModernStyles:
         
         style.configure(
             'Modern.TNotebook.Tab',
-            font=('Segoe UI', 10),
-            padding=(20, 10),
+            font=('Segoe UI', 9),
+            padding=(10, 5),
             background=self.colors['light'],
             foreground=self.colors['text_secondary']
         )
@@ -196,3 +196,4 @@ def create_modern_label(parent, text, style='Modern.TLabel'):
 def create_modern_notebook(parent):
     """Create a modern styled notebook (tabbed interface)"""
     return ttk.Notebook(parent, style='Modern.TNotebook')
+
